@@ -9,13 +9,16 @@ export default defineConfig({
   rules: {
     // TypeScript reports real redeclarations; this flags a schema and its type sharing a name.
     "no-redeclare": "off",
+    // The vault's writes and the Keychain's reads go one at a time, in order, on purpose.
+    "eslint/no-await-in-loop": "off",
+    // A field's checks and a save's many optional parts are one case each, read top to bottom.
+    "eslint/complexity": "off",
   },
   overrides: [
     {
-      // TanStack Virtual's virtualizer is mutable, so the compiler skips memoizing this one
-      // component, as the rule says; only its rendered rows leave it.
-      files: ["app/view/ui/side.tsx"],
-      rules: { "react/incompatible-library": "off" },
+      // Base32 and HOTP's dynamic truncation are bit arithmetic (RFC 4648, RFC 4226).
+      files: ["src/otp.ts"],
+      rules: { "eslint/no-bitwise": "off" },
     },
   ],
 })
