@@ -13,8 +13,8 @@ struct DevicesView: View {
   var body: some View {
     let all = vault.devices + vault.spurs
     let pending = all.filter(\.pending)
-    let devices = vault.devices.filter { !$0.pending }
-    let spurs = vault.spurs.filter { !$0.pending }
+    let devices = vault.devices.filter(\.active)
+    let spurs = vault.spurs.filter(\.active)
     VStack(spacing: 0) {
       Down(core: model.core)
       if let problem { Problem(text: problem) }
@@ -47,7 +47,7 @@ struct DevicesView: View {
             BoardSection(label: "Spurs", count: spurs.count) {
               Rule()
               ForEach(spurs) { m in
-                RowButton(action: {}) {
+                RowButton(action: { revoking = m }) {
                   Text(m.name).lineLimit(1)
                   Spacer(minLength: 8)
                 }

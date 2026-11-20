@@ -115,7 +115,7 @@ struct RootView: View {
 
   var body: some View {
     switch model.vault.phase {
-    case .fresh, .waiting:
+    case .fresh, .waiting, .revoked:
       NavigationStack { EnrollView(model: model) }
     case .locked:
       NavigationStack { LockView(model: model) }

@@ -18,7 +18,11 @@ struct EnrollView: View {
       if let problem { Problem(text: problem) }
       ScrollView {
         VStack(spacing: 0) {
-          if vault.phase == .waiting { waiting } else { form }
+          switch vault.phase {
+          case .waiting: waiting
+          case .revoked: revoked
+          default: form
+          }
         }
       }
     }
@@ -70,6 +74,17 @@ struct EnrollView: View {
       HStack {
         Spacer()
         Button("Cancel") { Task { await vault.forget() } }.buttonStyle(KeyStyle())
+      }
+      .padding(SIS.inset)
+    }
+  }
+
+  @ViewBuilder private var revoked: some View {
+    BoardSection(mark: AnyView(Stop(size: 13)), label: "Revoked", first: true) {
+      Rule()
+      HStack {
+        Spacer()
+        Button("Forget this iPhone") { Task { await vault.forget() } }.buttonStyle(KeyStyle(go: true))
       }
       .padding(SIS.inset)
     }

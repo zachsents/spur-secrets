@@ -38,9 +38,9 @@ struct ItemView: View {
             }
             Button("History", systemImage: "clock.arrow.circlepath") { model.path.append(.history(item.id)) }
             if item.trashed == 0 {
-              Button("Trash", systemImage: "trash", role: .destructive) { Task { await remove(item) } }
+              Button("Trash", systemImage: "trash", role: .destructive) { Task { await act { try await vault.trash(item, true) } } }
             } else {
-              Button("Restore", systemImage: "arrow.uturn.backward") { Task { await remove(item, restore: true) } }
+              Button("Restore", systemImage: "arrow.uturn.backward") { Task { await act { try await vault.trash(item, false) } } }
               Button("Delete", systemImage: "trash", role: .destructive) { purging = true }
             }
           } label: {
@@ -53,7 +53,8 @@ struct ItemView: View {
     .confirmationDialog("Delete \(vault.item(id)?.title ?? "") and its history?", isPresented: $purging, titleVisibility: .visible) {
       Button("Delete", role: .destructive) {
         Task {
-          if let item = vault.item(id) { await remove(item, purge: true) }
+          await act { try await vault.purge(id) }
+          dismiss()
         }
       }
     }
@@ -70,19 +71,13 @@ struct ItemView: View {
   private func favorite(_ item: Item) async {
     var item = item
     item.favorite.toggle()
-    do {
-      try await vault.put(item)
-      problem = nil
-    } catch {
-      problem = error.localizedDescription
-    }
+    await act { try await vault.put(item) }
   }
 
-  private func remove(_ item: Item, restore: Bool = false, purge: Bool = false) async {
+  private func act(_ work: () async throws -> Void) async {
     do {
-      try await vault.remove(item.id, restore: restore, purge: purge)
+      try await work()
       problem = nil
-      if purge { dismiss() }
     } catch {
       problem = error.localizedDescription
     }
@@ -117,8 +112,8 @@ struct ItemBody: View {
     if !item.notes.isEmpty {
       BoardSection(label: "Notes", count: nil) {
         Rule()
-        Text(item.notes).font(SIS.text(15)).foregroundStyle(SIS.ink).textSelection(.enabled)
-          .padding(SIS.inset).frame(maxWidth: .infinity, alignment: .leading)
+        // Notes are concealed, as the vault counts them.
+        FieldRow(model: model, item: item, field: Field(id: "notes", label: "Notes", type: .concealed, value: item.notes))
       }
     }
     BoardSection(label: "Details", count: nil) {

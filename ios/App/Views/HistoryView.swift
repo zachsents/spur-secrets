@@ -21,7 +21,7 @@ struct HistoryView: View {
             RowButton(action: { open = v }) {
               Text(v.item.title).lineLimit(1)
               Spacer(minLength: 8)
-              Figure(Date(timeIntervalSince1970: v.item.updated / 1000).formatted(date: .abbreviated, time: .shortened))
+              Figure(Date(timeIntervalSince1970: v.at / 1000).formatted(date: .abbreviated, time: .shortened))
             }
           }
         }
@@ -62,7 +62,7 @@ private struct VersionView: View {
         }
       }
       .background(SIS.paper)
-      .band(Date(timeIntervalSince1970: version.item.updated / 1000).formatted(date: .abbreviated, time: .shortened))
+      .band(Date(timeIntervalSince1970: version.at / 1000).formatted(date: .abbreviated, time: .shortened))
       .toolbar {
         ToolbarItem(placement: .topBarLeading) { Button("Close") { done() } }
         ToolbarItem(placement: .topBarTrailing) {

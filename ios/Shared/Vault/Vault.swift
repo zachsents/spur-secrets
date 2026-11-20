@@ -6,38 +6,36 @@ nonisolated struct Member: Identifiable, Hashable, Sendable {
   let id: String
   let name: String
   let kind: String
+  /// Its public key: what an approval's proof covers, and what its code is made from.
   let key: String
-  let pending: Bool
+  let status: String
 
   init(device j: JSON) {
-    id = j["id"].string ?? j["device"].str
+    id = j["id"].str
     name = j["name"].str
     kind = j["kind"].str
     key = j["key"].str
-    pending = Self.pending(j)
+    status = j["status"].str
   }
 
   init(spur j: JSON) {
-    id = j["spur"].string ?? j["name"].str
+    id = j["name"].str
     name = id
     kind = "spur"
     key = j["key"].str
-    pending = Self.pending(j)
+    status = j["status"].str
   }
 
-  private static func pending(_ j: JSON) -> Bool {
-    if let approved = j["approved"].bool { return !approved }
-    if j["approved"].number != nil { return false }
-    let state = j["state"].string ?? j["status"].str
-    return ["pending", "waiting", "enrolling"].contains(state)
-  }
-
-  var code: String { Crypto.code(of: key) }
+  var pending: Bool { status == "pending" }
+  var active: Bool { status == "active" }
+  /// The code it shows, made here from the key the proof will cover, so a match means that key.
+  var code: String { key.isEmpty ? "" : Crypto.code(of: key) }
 }
 
-/// One past version of an item (`history`).
+/// One past version of an item (`history`): as it was until `at`.
 nonisolated struct Version: Identifiable, Hashable, Sendable {
   let id: Int
+  let at: Double
   let item: Item
 }
 
@@ -45,7 +43,7 @@ nonisolated struct Version: Identifiable, Hashable, Sendable {
 /// write. The vault key and the items opened with it are only in memory, and only while unlocked.
 @MainActor @Observable
 final class Vault {
-  enum Phase: Equatable { case fresh, waiting, locked, open }
+  enum Phase: Equatable { case fresh, waiting, locked, open, revoked }
 
   let core: Core
   private(set) var cache = Cache.load()
@@ -54,11 +52,11 @@ final class Vault {
   /// What the last sync said went wrong.
   private(set) var problem: String?
   private(set) var syncing = false
+  /// The vault no longer knows this device.
+  private(set) var revoked = false
   private var keys: Crypto.Keys?
   @ObservationIgnored private var secret: Curve25519.KeyAgreement.PrivateKey?
   @ObservationIgnored private var pendingSync = false
-  /// Read every blob again on the next sync.
-  @ObservationIgnored private var full = false
 
   init(core: Core) {
     self.core = core
@@ -66,6 +64,7 @@ final class Vault {
 
   var phase: Phase {
     if cache.device.isEmpty { return .fresh }
+    if revoked { return .revoked }
     if cache.sealed == nil { return .waiting }
     return keys == nil ? .locked : .open
   }
@@ -95,6 +94,7 @@ final class Vault {
     Keychain.delete()
     cache = Cache()
     cache.save()
+    revoked = false
     await Identities.clear()
   }
 
@@ -117,13 +117,19 @@ final class Vault {
   }
 
   private func syncOnce() async {
-    let since = full || cache.sealed == nil || cache.vault.isEmpty ? 0 : cache.seq
-    full = false
+    let since = cache.sealed == nil || cache.vault.isEmpty ? 0 : cache.seq
     let r: JSON
     do {
-      r = try await core.call("sync", ["device": .string(cache.device), "since": .number(Double(since))])
+      var args: JSON = ["device": .string(cache.device), "since": .number(Double(since))]
+      if cache.sealed != nil { args = merge(args, ["version": .number(Double(cache.keyVersion))]) }
+      r = try await core.call("sync", args)
       problem = nil
     } catch {
+      if error.localizedDescription == "Not a device of this vault" {
+        revoked = true
+        lock()
+        return
+      }
       // Waiting to be approved isn't a problem to show.
       if cache.sealed != nil { problem = error.localizedDescription }
       return
@@ -137,7 +143,8 @@ final class Vault {
     if case .object = r["key"], !r["key"]["enc"].str.isEmpty {
       next.sealed = Cache.Sealed(enc: r["key"]["enc"].str, ct: r["key"]["ct"].str)
     }
-    if since == 0 { next.items = [:] }
+    // A new key version brings every item again, sealed under it.
+    if since == 0 || moved { next.items = [:] }
     for e in r["items"].array {
       let id = e["id"].str
       if e["deleted"].bool == true || e["blob"].str.isEmpty {
@@ -155,11 +162,6 @@ final class Vault {
     }
     cache = next
     cache.save()
-    // The key was rotated: read every blob again under the new version.
-    if moved && since > 0 {
-      full = true
-      pendingSync = true
-    }
     if let secret, keys == nil || keys?.version != cache.keyVersion || moved {
       try? open(secret)
     } else if keys != nil {
@@ -222,24 +224,26 @@ final class Vault {
   func history(_ id: String) async throws -> [Version] {
     guard let keys else { throw Failure(message: "Locked") }
     let r = try await core.call("history", ["device": .string(cache.device), "id": .string(id)])
-    let rows = [r["history"], r["versions"], r["blobs"], r].first { !$0.array.isEmpty }?.array ?? []
-    return rows.enumerated().compactMap { n, row in
-      let blob = row.string ?? row["blob"].str
-      guard let json = try? Crypto.openItem(keys, id: id, blob: blob), let item = Item.from(json) else { return nil }
-      return Version(id: n, item: item)
+    return r["history"].array.enumerated().compactMap { n, row in
+      guard let json = try? Crypto.openItem(keys, id: id, blob: row["blob"].str), let item = Item.from(json) else { return nil }
+      return Version(id: n, at: row["at"].number ?? item.updated, item: item)
     }
-    .sorted { $0.item.updated > $1.item.updated }
+    .sorted { $0.at > $1.at }
   }
 
-  /// To the trash, back from it, or gone with its history (which takes a proof).
-  func remove(_ id: String, restore: Bool = false, purge: Bool = false) async throws {
-    var args: JSON = ["device": .string(cache.device), "id": .string(id)]
-    if restore { args = merge(args, ["restore": true]) }
-    if purge {
-      guard let keys else { throw Failure(message: "Locked") }
-      args = merge(args, ["purge": true, "proof": .string(Crypto.prove(keys, Crypto.statement("purge", id)))])
-    }
-    _ = try await core.call("remove", args)
+  /// To the trash, or back: the item sealed again with when it was trashed.
+  func trash(_ item: Item, _ on: Bool) async throws {
+    var item = item
+    item.trashed = on ? Date().timeIntervalSince1970 * 1000 : 0
+    try await put(item)
+  }
+
+  /// Gone, with its history: that takes a proof.
+  func purge(_ id: String) async throws {
+    guard let keys else { throw Failure(message: "Locked") }
+    let proof = Crypto.prove(keys, Crypto.statement("purge", id))
+    _ = try await core.call("remove", ["device": .string(cache.device), "id": .string(id), "proof": .string(proof)])
+    items.removeAll { $0.id == id }
     await sync()
   }
 
@@ -247,9 +251,10 @@ final class Vault {
 
   func approve(_ member: Member) async throws {
     guard let keys else { throw Failure(message: "Locked") }
+    guard !member.key.isEmpty else { throw Failure(message: "The vault sent no key for \(member.name)") }
     if member.kind == "spur" {
       let proof = Crypto.prove(keys, Crypto.statement("approve-spur", member.id, member.key))
-      _ = try await core.call("spur_approve", ["device": .string(cache.device), "spur": .string(member.id), "proof": .string(proof)])
+      _ = try await core.call("spur_approve", ["spur": .string(member.id), "proof": .string(proof)])
     } else {
       let proof = Crypto.prove(keys, Crypto.statement("approve-device", member.id, member.key))
       _ = try await core.call("device_approve", ["device": .string(member.id), "proof": .string(proof)])
@@ -259,8 +264,13 @@ final class Vault {
 
   func revoke(_ member: Member) async throws {
     guard let keys else { throw Failure(message: "Locked") }
-    let proof = Crypto.prove(keys, Crypto.statement("revoke-device", member.id))
-    _ = try await core.call("device_revoke", ["device": .string(member.id), "proof": .string(proof)])
+    if member.kind == "spur" {
+      let proof = Crypto.prove(keys, Crypto.statement("revoke-spur", member.id))
+      _ = try await core.call("spur_revoke", ["spur": .string(member.id), "proof": .string(proof)])
+    } else {
+      let proof = Crypto.prove(keys, Crypto.statement("revoke-device", member.id))
+      _ = try await core.call("device_revoke", ["device": .string(member.id), "proof": .string(proof)])
+    }
     await sync()
   }
 
