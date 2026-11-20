@@ -35,6 +35,9 @@ export const find = (v: Vault, given: string): Item => {
   )
 }
 
+/** What spur-browser called a card's parts before the vault. */
+const ALIASES: Record<string, string> = { name: "holder", "security-code": "cvc" }
+
 /** What a reference names: `name` (its main secret) or `name.field`, the longest name that fits. */
 export const resolve = (v: Vault, ref: string): { item: Item; field: Field } => {
   const r = ref.trim()
@@ -57,8 +60,9 @@ export const resolve = (v: Vault, ref: string): { item: Item; field: Field } => 
       }
       throw new Error(`${item.name} holds no secret yet`)
     }
+    const id = ALIASES[rest] ?? rest
     const field = item.fields.find(
-      (f) => f.id === rest || f.label.toLowerCase() === rest.toLowerCase(),
+      (f) => f.id === id || f.label.toLowerCase() === rest.toLowerCase(),
     )
     if (field && field.value !== "") {
       return { item, field }
