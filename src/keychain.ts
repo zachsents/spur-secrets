@@ -50,9 +50,20 @@ export const keychainRead = async (service: string, account: string): Promise<un
   if (file !== undefined) {
     return fileItems(file)[`${service}/${account}`] ?? null
   }
-  const { code, out } = await run(["find-generic-password", "-s", service, "-a", account, "-w"])
-  if (code !== 0) {
+  const { code, out, err } = await run([
+    "find-generic-password",
+    "-s",
+    service,
+    "-a",
+    account,
+    "-w",
+  ])
+  // 44 is "not found"; anything else (a locked Keychain, no one to answer it) isn't an answer.
+  if (code === 44) {
     return null
+  }
+  if (code !== 0) {
+    throw new Error(`This Mac's Keychain can't be read here: ${err.trim().slice(0, 160)}`)
   }
   const printed = out.trim()
   // `security` prints data that isn't plain text as hex.
@@ -65,15 +76,20 @@ export const keychainRead = async (service: string, account: string): Promise<un
   }
 }
 
-/** Keeps an item (replacing one by the account), and checks it reads back as written. */
-export const keychainWrite = async (service: string, account: string, value: unknown) => {
+/** Keeps an item (replacing one by the account unless `fresh`), and checks it reads back as written. */
+export const keychainWrite = async (
+  service: string,
+  account: string,
+  value: unknown,
+  fresh = false,
+) => {
   const data = JSON.stringify(value)
   const file = keyFile()
   if (file !== undefined) {
     writePrivate(file, JSON.stringify({ ...fileItems(file), [`${service}/${account}`]: value }))
     return
   }
-  const line = `add-generic-password -U -s "${service}" -a "${account}" -l "${service}" -X ${hex(data)}\n`
+  const line = `add-generic-password ${fresh ? "" : "-U "}-s "${service}" -a "${account}" -l "${service}" -X ${hex(data)}\n`
   const { code, err } = await run(["-i"], line)
   if (code !== 0 || err.includes("error")) {
     throw new Error(`The Keychain wouldn't keep ${account}: ${err.trim().slice(0, 160)}`)

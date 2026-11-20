@@ -3,7 +3,7 @@
 // into memory when the spur starts and sealed again on every write. Each write bumps the vault's
 // sequence, which is how devices sync (`since`).
 import { Database } from "bun:sqlite"
-import { existsSync, mkdirSync, rmSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, rmSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 
@@ -135,13 +135,21 @@ const keptOf = async (vault: string): Promise<Kept | null> => {
   return raw === null ? null : Schema.decodeUnknownSync(Kept)(raw)
 }
 
-/** Opens the vault in `at`, making it (and its key) the first time. */
-export const openVault = async (at = dir()): Promise<Vault> => {
+/** The vault's file, without its key: what's in it that isn't sealed. */
+export const openDb = (at = dir()): Database => {
   mkdirSync(at, { recursive: true, mode: 0o700 })
-  const db = new Database(path.join(at, "vault.db"), { create: true, strict: true })
+  const file = path.join(at, "vault.db")
+  const db = new Database(file, { create: true, strict: true })
+  chmodSync(file, 0o600)
   db.run("pragma journal_mode = wal")
   db.run("pragma busy_timeout = 5000")
   db.run(SCHEMA)
+  return db
+}
+
+/** Opens the vault in `at`, making it (and its key) the first time. */
+export const openVault = async (at = dir()): Promise<Vault> => {
+  const db = openDb(at)
   const vault = meta(db, "vault") ?? crypto.randomUUID()
   setMeta(db, "vault", vault)
   let kept = await keptOf(vault)
@@ -152,7 +160,7 @@ export const openVault = async (at = dir()): Promise<Vault> => {
     }
     const pair = await newKeyPair()
     kept = { version: 1, key: b64(newVaultKey()), spurKey: pair.key, spurSecret: pair.secretKey }
-    await keychainWrite(SERVICE, `vault:${vault}`, kept)
+    await keychainWrite(SERVICE, `vault:${vault}`, kept, true)
   }
   const keys = await keysOf(vault, kept.version, unb64(kept.key))
   const v: Vault = {
@@ -298,7 +306,7 @@ export const changedSince = (v: Vault, since: number) =>
 
 // Devices and spurs.
 
-export const devices = (v: Vault): Device[] =>
+export const devices = (v: Pick<Vault, "db">): Device[] =>
   v.db
     .query<Device, []>(
       "select id, name, kind, key, code, status, created, approved, seen from devices order by created",
@@ -389,7 +397,7 @@ export const rotate = async (v: Vault) => {
   await keychainWrite(SERVICE, account, { ...kept, version, key: b64(raw) })
 }
 
-export const spurs = (v: Vault): Spur[] =>
+export const spurs = (v: Pick<Vault, "db">): Spur[] =>
   v.db
     .query<Spur, []>(
       "select name, key, code, status, created, approved from spurs order by created",

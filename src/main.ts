@@ -1,62 +1,100 @@
-// The secrets spur as a stdio MCP server: `bun src/main.ts`. With a word, a one-off on this Mac's
-// vault, for its owner at its own terminal:
-//   approve <code>   approves the device or spur showing that code
-//   status           the vault's devices, spurs and how many items it holds (nothing secret)
-//   backup           a copy of the sealed vault file now
+// The secrets spur as a stdio MCP server: `bun src/main.ts`. With a word, a one-off for the vault
+// Mac's owner at its terminal (or over ssh), which needs no Keychain:
+//   approve <code>   approves the device or spur showing that code (the running spur does it)
+//   status           the vault's devices and spurs, and how many items it holds (nothing secret)
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import path from "node:path"
+
 import { Effect, Layer } from "effect"
 import { Models, serveStdio } from "spur-kit"
 
 import { announce, secretsApp } from "./app.ts"
-import { approveCode } from "./ops.ts"
-import { backup, devices, openVault, seedGrants, spurs } from "./store.ts"
+import { approveCode, serial, touched } from "./ops.ts"
+import { backup, devices, dir, openDb, openVault, seedGrants, spurs } from "./store.ts"
+import type { Vault } from "./store.ts"
 
 /** Devices and spurs without their keys. */
 const show = <A extends { key: string }>(xs: readonly A[]) => xs.map(({ key: _, ...rest }) => rest)
 
-const vault = await openVault()
-seedGrants(vault)
+/** Where `approve` leaves a code for the running spur, and finds what it made of it. */
+const ASKED = path.join(dir(), "approve")
 
 const word = process.argv.at(2)
 if (word === "approve") {
-  console.log(await approveCode(vault, process.argv.at(3) ?? ""))
+  const code = (process.argv.at(3) ?? "").replaceAll(/\D/gu, "")
+  mkdirSync(ASKED, { recursive: true, mode: 0o700 })
+  const asked = path.join(ASKED, code)
+  writeFileSync(asked, "", { mode: 0o600 })
+  for (let i = 0; i < 40 && existsSync(asked); i += 1) {
+    await Bun.sleep(250)
+  }
+  const said = `${asked}.done`
+  console.log(existsSync(said) ? readFileSync(said, "utf-8") : "The secrets spur isn't running")
+  rmSync(asked, { force: true })
+  rmSync(said, { force: true })
   process.exit(0)
-} else if (word === "status") {
+}
+if (word === "status") {
+  const db = { db: openDb() }
+  const count = db.db
+    .query<{ n: number }, []>("select count(*) as n from items where purged = 0")
+    .get()
   console.log(
     JSON.stringify(
-      {
-        vault: vault.keys.vault,
-        keyVersion: vault.keys.version,
-        items: vault.items.size,
-        devices: show(devices(vault)),
-        spurs: show(spurs(vault)),
-      },
+      { items: count?.n ?? 0, devices: show(devices(db)), spurs: show(spurs(db)) },
       null,
       1,
     ),
   )
   process.exit(0)
-} else if (word === "backup") {
-  console.log(backup(vault))
-  process.exit(0)
-} else if (word !== undefined) {
-  console.error(`Unknown command ${word}: approve <code>, status or backup`)
+}
+if (word !== undefined) {
+  console.error(`Unknown command ${word}: approve <code> or status`)
   process.exit(2)
 }
 
+const vault = await openVault()
+seedGrants(vault)
 const app = secretsApp(vault)
 
-// A copy of the sealed vault a day, kept for two weeks.
-const backups = Effect.forever(
-  Effect.andThen(
-    Effect.sync(() => backup(vault)),
-    Effect.sleep("6 hours"),
-  ),
-)
+/** Approves each code left by `approve`, and says how it went beside it. */
+const approvals = (v: Vault) =>
+  Effect.promise(async () => {
+    if (!existsSync(ASKED)) {
+      return
+    }
+    for (const code of readdirSync(ASKED).filter((f) => /^\d{6}$/u.test(f))) {
+      const said = await serial(async () => {
+        try {
+          const done = await approveCode(v, code)
+          touched(v)
+          return done
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error)
+        }
+      })
+      writeFileSync(path.join(ASKED, `${code}.done`), said, { mode: 0o600 })
+      rmSync(path.join(ASKED, code), { force: true })
+    }
+  })
 
 const background = Layer.effectDiscard(
   Effect.gen(function* starting() {
     yield* Effect.forkScoped(announce)
-    yield* Effect.forkScoped(Effect.ignore(backups))
+    // A copy of the sealed vault a day, kept for two weeks.
+    yield* Effect.forkScoped(
+      Effect.forever(
+        Effect.andThen(
+          Effect.sync(() => backup(vault)),
+          Effect.sleep("6 hours"),
+        ),
+      ).pipe(Effect.ignore),
+    )
+    yield* Effect.forkScoped(
+      Effect.forever(Effect.andThen(approvals(vault), Effect.sleep("1 second"))).pipe(
+        Effect.ignore,
+      ),
+    )
   }),
 )
 
