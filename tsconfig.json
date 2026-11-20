@@ -1,0 +1,9 @@
+{
+  // Three programs: the spur, the app's view (DOM) and the app's bun process.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.spur.json" },
+    { "path": "./tsconfig.view.json" },
+    { "path": "./tsconfig.bun.json" }
+  ]
+}

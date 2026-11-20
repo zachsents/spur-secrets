@@ -1,0 +1,5 @@
+{
+  // The spur: what Switch runs.
+  "extends": "./tsconfig.base.json",
+  "include": ["src"]
+}
