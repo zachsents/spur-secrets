@@ -46,8 +46,10 @@ An item's **name** is lowercase letters, digits and `. _ / @ -` (`github`, `card
 ## Crypto
 
 - **Vault key** `VK`: 32 random bytes, made once, kept in the vault Mac's login Keychain (service
-  `Switch secrets`, account `vault-key:<vault id>`), piped to `security -i` so it's never in argv.
-  Rotated (a new key version) whenever a device is revoked.
+  `Switch secrets`, account `vault:<vault id>`, beside this spur's own key pair), piped to
+  `security -i` so it's never in argv. A Keychain that can't be read is an error, never a new key.
+  Rotated (a new key version) whenever a device is revoked; a rotation cut short finishes at the
+  next start.
 - **Subkeys**, HKDF-SHA256 over `VK` with an empty salt and 32 bytes out: the item key
   (`info` = `switch-secrets-v1 items`) and the approval key (`switch-secrets-v1 approve`).
 - **An item at rest and in sync** is one blob: `base64(nonce[12] ‖ AES-256-GCM(item key, JSON))`
@@ -64,13 +66,13 @@ An item's **name** is lowercase letters, digits and `. _ / @ -` (`github`, `card
   - a deposit from a spur to this one: item `deposit:<deposit id>`, use `<spur>`, the secret the
     item JSON (`Draft` in `src/model.ts`);
   - a sealed ask's answer: as spur-kit's sealed asks make it.
-- **This spur's key** (an X25519 pair for deposits) is in the same Keychain service, account
-  `spur-key:<vault id>`.
+- **This spur's key** (an X25519 pair for deposits) is in the same Keychain item.
 - **Proofs.** What only the user may do (approve a device or a spur, revoke, change grants, purge)
   carries `proof` = `base64(HMAC-SHA256(approval key, statement))`, made on an enrolled device,
   which alone holds `VK`. The statement is the NUL-joined words of the call, listed with each tool
   below. Until a device is enrolled, approvals go through the user's queue (an approval item) or
-  the vault Mac's own terminal (`bun src/main.ts approve <code>`).
+  the vault Mac's own terminal (`bun src/main.ts approve <code>`, which hands the code to the
+  running spur; `status` lists devices and spurs).
 
 ## Devices and sync
 
@@ -81,9 +83,11 @@ An item's **name** is lowercase letters, digits and `. _ / @ -` (`github`, `card
 2. It's approved: from an enrolled device (`device_approve { device, proof }` over
    `approve-device\0<device>\0<key>`), or, while none is, in the user's queue, where the same code
    shows. The spur then seals `VK` to the device's key.
-3. `sync { device, since }` → `{ vault, keyVersion, seq, key?, items: [{ id, seq, deleted, blob }],
-   devices, spurs, grants }`: every item changed after `since` (all of them from 0). `key` (the
-   sealed `VK`) comes when `since` is 0 or the key version moved. The core relays only ciphertext.
+3. `sync { device, since, version? }` → `{ vault, status, seq, keyVersion, key?, items: [{ id, seq,
+   deleted, blob }], devices, spurs, grants }` (devices and spurs with their public keys): every
+   item changed after `since` (all of them from 0, or when `version` isn't the key version now).
+   `key` (the sealed `VK`) comes when `since` is 0 or the key version moved. A totp field's value
+   is an `otpauth://` link; an item's notes count as concealed. The core relays only ciphertext.
    The event `secrets.changed { seq }` says when to sync again.
 4. A device writes by sealing the item itself: `put { device, id, blob }`. The spur checks it opens
    under the item key (only a holder of `VK` can make one), keeps what it was in history, and
@@ -119,7 +123,8 @@ copy, autofill, export) so the audit is whole.
 
 A spur that fills or sends secrets (the browser) registers a key: `spur_register { spur, key }`,
 approved like a device (`spur_approve { spur, proof }` over `approve-spur\0<spur>\0<key>`). Then
-`release { spur, item, fields?, url?, use, why?, space? }` → `{ id, enc, ct }` sealed to it, after the
+`release { spur, item | ref, fields?, url?, use, why?, space? }` → `{ id, item, name, title, labels,
+fields, enc, ct }`, the values sealed to it (a totp field as its code now), after the
 grants allow the spur that use and, for an item with `urls`, the page's `url` matches one. It keeps
 what it learns with `deposit { spur, id, enc, ct }`. These go through the core's
 `/widgets/secrets/<tool>`, as clients call it.
