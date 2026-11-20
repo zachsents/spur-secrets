@@ -65,6 +65,7 @@ struct DevicesView: View {
       titleVisibility: .visible, presenting: approving
     ) { m in
       Button("Approve") { Task { await act("Approve \(m.name)") { try await vault.approve(m) } } }
+      Button("Deny", role: .destructive) { Task { await act("Deny \(m.name)") { try await vault.revoke(m) } } }
       Button("Cancel", role: .cancel) {}
     } message: { m in
       Text(m.code)
