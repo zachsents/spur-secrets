@@ -491,7 +491,7 @@ export const lastUsed = (v: Vault): Map<string, number> =>
   new Map(
     v.db
       .query<{ item: string; at: number }, []>(
-        "select item, max(at) as at from audit where ok = 1 group by item",
+        "select item, max(at) as at from audit where ok = 1 and use in ('fill', 'env', 'file', 'http', 'reveal', 'copy', 'autofill') group by item",
       )
       .all()
       .map((r) => [r.item, r.at]),
