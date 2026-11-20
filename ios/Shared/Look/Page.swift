@@ -42,6 +42,17 @@ struct Down: View {
   let core: Core
 
   var body: some View {
+    if let code = core.pairCode {
+      HStack(spacing: 8) {
+        Hand(size: 12)
+        Text("Pair").font(SIS.text(13, weight: .semibold)).foregroundStyle(SIS.ink)
+        Spacer(minLength: 0)
+        Text(code).font(SIS.data(13)).foregroundStyle(SIS.ink).textSelection(.enabled)
+      }
+      .padding(.horizontal, SIS.inset)
+      .frame(minHeight: 36)
+      .overlay(alignment: .bottom) { Rule() }
+    }
     if !core.configured {
       Problem(text: "No core set")
     } else if core.link == .down {

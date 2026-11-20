@@ -98,8 +98,10 @@ struct EnrollView: View {
     if !model.core.configured {
       let given = core.trimmingCharacters(in: .whitespaces)
       Config.defaults.set(given, forKey: "core")
+      model.core.forgetToken()
       model.core.configure(given)
       guard model.core.configured else { return problem = "That isn't a core address" }
+      model.pair()
     }
     do {
       try await vault.enroll(name: name.trimmingCharacters(in: .whitespaces))

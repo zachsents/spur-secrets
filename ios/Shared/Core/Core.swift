@@ -24,6 +24,10 @@ final class Core: NSObject, URLSessionWebSocketDelegate {
   private(set) var http: URL?
   @ObservationIgnored private var socket: URL?
   @ObservationIgnored private var started = false
+  /// The credential the core gave this app when its pairing was approved (Pairing.swift).
+  @ObservationIgnored var token = CoreToken.load()
+  /// The code to approve while a pairing waits.
+  var pairCode: String?
 
   @ObservationIgnored private var watched: Set<String> = []
   @ObservationIgnored private var handlers: [(String, JSON) -> Void] = []
@@ -60,6 +64,17 @@ final class Core: NSObject, URLSessionWebSocketDelegate {
 
   var configured: Bool { http != nil }
 
+  /// The socket again, with what's changed (a token).
+  func reconnect() {
+    if started { open() }
+  }
+
+  /// A token is good only for the core that gave it: dropped when the core changes.
+  func forgetToken() {
+    CoreToken.delete()
+    token = nil
+  }
+
   // MARK: Tools
 
   /// Calls one of the spur's tools (or another app's, `app:`): its structured result.
@@ -68,15 +83,18 @@ final class Core: NSObject, URLSessionWebSocketDelegate {
     var request = URLRequest(url: http.appending(path: "widgets/\(app ?? self.app)/\(tool)"))
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
     request.httpBody = args.data
     request.timeoutInterval = 30
     request.cachePolicy = .reloadIgnoringLocalCacheData
     let data: Data
+    let response: URLResponse
     do {
-      (data, _) = try await URLSession.shared.data(for: request)
+      (data, response) = try await URLSession.shared.data(for: request)
     } catch {
       throw Failure(message: "Can't reach the core")
     }
+    if (response as? HTTPURLResponse)?.statusCode == 401 { throw Failure(message: "Not paired with the core") }
     guard let r = JSON.parse(data) else { throw Failure(message: "The core's answer didn't read") }
     let text = r["content"].array.first { $0["type"].str == "text" }?["text"].str ?? ""
     if r["isError"].bool == true {
@@ -122,6 +140,7 @@ final class Core: NSObject, URLSessionWebSocketDelegate {
     task?.cancel(with: .goingAway, reason: nil)
     var c = URLComponents(url: socket, resolvingAgainstBaseURL: false)!
     var query = [URLQueryItem(name: "source", value: "\(app)-iphone")]
+    if let token { query.append(URLQueryItem(name: "token", value: token)) }
     if let cursor { query.append(URLQueryItem(name: "since", value: String(cursor))) }
     c.queryItems = query
     let t = session.webSocketTask(with: c.url!)

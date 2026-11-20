@@ -88,8 +88,17 @@ final class Vault {
     cache.save()
   }
 
-  /// Leaves the vault on this device: its key, its cache and what AutoFill knew.
+  /// Leaves the vault on this device: revoked there while it can prove it, then its key, its
+  /// cache and what AutoFill knew gone here.
   func forget() async {
+    if let keys, !revoked {
+      let proof = Crypto.prove(keys, Crypto.statement("revoke-device", cache.device))
+      do {
+        _ = try await core.call("device_revoke", ["device": .string(cache.device), "proof": .string(proof)])
+      } catch {
+        NSLog("Secrets: revoking this device failed: %@", error.localizedDescription)
+      }
+    }
     lock()
     Keychain.delete()
     cache = Cache()

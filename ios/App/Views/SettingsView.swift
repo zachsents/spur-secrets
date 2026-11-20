@@ -24,7 +24,9 @@ struct SettingsView: View {
               Button("Save") {
                 let given = core.trimmingCharacters(in: .whitespaces)
                 Config.defaults.set(given, forKey: "core")
+                model.core.forgetToken()
                 model.core.configure(given)
+                model.pair()
                 Task { await vault.sync() }
               }
               .buttonStyle(KeyStyle())

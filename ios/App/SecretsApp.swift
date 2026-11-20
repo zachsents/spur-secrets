@@ -58,6 +58,12 @@ final class Model {
     }
     core.start()
     Task { await vault.sync() }
+    pair()
+  }
+
+  /// A credential for the core, if this app has none yet.
+  func pair() {
+    Task { await core.pair(name: "Secrets on \(UIDevice.current.name)") }
   }
 
   func moved(to phase: ScenePhase) {
@@ -131,6 +137,10 @@ struct RootView: View {
             case .settings: SettingsView(model: model)
             }
           }
+      }
+      .onDisappear {
+        model.path = []
+        model.editing = nil
       }
       .sheet(item: $model.editing) { draft in
         EditView(model: model, original: draft.item, new: draft.new)

@@ -64,7 +64,7 @@ struct DevicesView: View {
       "Approve \(approving?.name ?? "")?", isPresented: Binding(get: { approving != nil }, set: { if !$0 { approving = nil } }),
       titleVisibility: .visible, presenting: approving
     ) { m in
-      Button("Approve") { Task { await act { try await vault.approve(m) } } }
+      Button("Approve") { Task { await act("Approve \(m.name)") { try await vault.approve(m) } } }
       Button("Cancel", role: .cancel) {}
     } message: { m in
       Text(m.code)
@@ -73,13 +73,13 @@ struct DevicesView: View {
       "Revoke \(revoking?.name ?? "")?", isPresented: Binding(get: { revoking != nil }, set: { if !$0 { revoking = nil } }),
       titleVisibility: .visible, presenting: revoking
     ) { m in
-      Button("Revoke", role: .destructive) { Task { await act { try await vault.revoke(m) } } }
+      Button("Revoke", role: .destructive) { Task { await act("Revoke \(m.name)") { try await vault.revoke(m) } } }
       Button("Cancel", role: .cancel) {}
     }
   }
 
-  private func act(_ work: () async throws -> Void) async {
-    guard await model.confirm("Approve") else { return }
+  private func act(_ reason: String, _ work: () async throws -> Void) async {
+    guard await model.confirm(reason) else { return }
     do {
       try await work()
       problem = nil
