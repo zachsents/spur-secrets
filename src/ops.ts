@@ -393,7 +393,9 @@ export const trash = async (v: Vault, ref: string, who: string) => {
 
 export const ReleaseInput = Schema.Struct({
   spur: Schema.String,
-  item: Schema.String,
+  /** An item's name or id; or `ref`, a reference (name.field) naming the field too. */
+  item: Schema.optionalKey(Schema.String),
+  ref: Schema.optionalKey(Schema.String),
   fields: Schema.optionalKey(Schema.Array(Schema.String)),
   url: Schema.optionalKey(Schema.String),
   use: Schema.optionalKey(Schema.Literals(["fill", "env", "file", "http"])),
@@ -411,7 +413,8 @@ const activeSpur = (v: Vault, name: string) => {
 
 export const release = async (v: Vault, input: typeof ReleaseInput.Type) => {
   const s = activeSpur(v, input.spur)
-  const item = find(v, input.item)
+  const named = input.ref === undefined ? null : resolve(v, input.ref)
+  const item = named?.item ?? find(v, input.item ?? "")
   const use: UseKind = input.use ?? "fill"
   const who = `spur:${s.name}`
   const target = input.url === undefined ? "" : hostOf(input.url)
@@ -432,7 +435,7 @@ export const release = async (v: Vault, input: typeof ReleaseInput.Type) => {
       `${item.name} is kept for ${item.urls.map((u) => hostOf(u.url)).join(", ")}, not ${target || "that page"}`,
     )
   }
-  const wanted = input.fields ?? [mainField(item)?.id ?? ""]
+  const wanted = input.fields ?? [named?.field.id ?? mainField(item)?.id ?? ""]
   const values: Record<string, string> = {}
   for (const id of wanted) {
     const f = item.fields.find((x) => x.id === id)
@@ -451,7 +454,18 @@ export const release = async (v: Vault, input: typeof ReleaseInput.Type) => {
     JSON.stringify(values),
   )
   note(v, { ...base, field: Object.keys(values).join(","), target: target || use })
-  return { id, item: item.id, fields: Object.keys(values), ...sealed }
+  const labels = Object.fromEntries(
+    Object.keys(values).map((f) => [f, item.fields.find((x) => x.id === f)?.label ?? f]),
+  )
+  return {
+    id,
+    item: item.id,
+    name: item.name,
+    title: item.title,
+    labels,
+    fields: Object.keys(values),
+    ...sealed,
+  }
 }
 
 export const DepositInput = Schema.Struct({
@@ -796,8 +810,8 @@ export const sync = (v: Vault, device: string, since: number, version: number | 
     vault: v.keys.vault,
     status: d.status,
     seq: store.seqOf(v),
-    devices: store.devices(v).map(({ key: _, ...rest }) => rest),
-    spurs: store.spurs(v).map(({ key: _, ...rest }) => rest),
+    devices: store.devices(v),
+    spurs: store.spurs(v),
   }
   if (d.status === "pending") {
     return { ...base, code: d.code, items: [] }
