@@ -20,5 +20,11 @@ export default defineConfig({
       files: ["src/otp.ts"],
       rules: { "eslint/no-bitwise": "off" },
     },
+    {
+      // TanStack Virtual's virtualizer is mutable, so the compiler skips memoizing these
+      // components, as the rule says; only their rendered rows leave them.
+      files: ["app/view/ui/list.tsx", "app/view/ui/panel.tsx"],
+      rules: { "react/incompatible-library": "off" },
+    },
   ],
 })

@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "start": "bun src/main.ts",
-    "app": "electrobun prepare && vite build && electrobun dev",
+    "app": "electrobun prepare && vite build && swiftc -O -o dist/secrets-helper app/helper/main.swift && electrobun dev",
     "app:view": "vite",
     "app:build": "sh scripts/app.sh",
     "typecheck": "tsc --noEmit -p tsconfig.spur.json && tsc --noEmit -p tsconfig.view.json && tsc --noEmit -p tsconfig.bun.json",
@@ -16,17 +16,6 @@
     "format": "oxfmt --write .",
     "fix": "bun run lint && bun run format",
     "check": "electrobun prepare >/dev/null && bun run typecheck && bun run fix"
-  },
-  "spur": {
-    "name": "secrets",
-    "main": "src/main.ts",
-    "needs": [
-      "always-on"
-    ],
-    "space": {
-      "id": "home",
-      "name": "Home"
-    }
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.4.0",
@@ -62,5 +51,16 @@
     "typescript": "^7",
     "ultracite": "^8.3.1",
     "vite": "^8.3.8"
+  },
+  "spur": {
+    "name": "secrets",
+    "main": "src/main.ts",
+    "needs": [
+      "always-on"
+    ],
+    "space": {
+      "id": "home",
+      "name": "Home"
+    }
   }
 }
