@@ -3,7 +3,7 @@
 // into memory when the spur starts and sealed again on every write. Each write bumps the vault's
 // sequence, which is how devices sync (`since`).
 import { Database } from "bun:sqlite"
-import { chmodSync, existsSync, mkdirSync, rmSync } from "node:fs"
+import { chmodSync, mkdirSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 
@@ -519,19 +519,4 @@ export const askOf = async (v: Vault, id: string): Promise<unknown> => {
 
 export const dropAsk = (v: Vault, id: string) => {
   v.db.run("delete from asks where id = ?", [id])
-}
-
-/** A copy of the vault file (sealed, as it is), kept by day: the last 14. */
-export const backup = (v: Vault, at = dir()): string => {
-  const folder = path.join(at, "backups")
-  mkdirSync(folder, { recursive: true, mode: 0o700 })
-  const file = path.join(folder, `vault-${new Date().toISOString().slice(0, 10)}.db`)
-  if (!existsSync(file)) {
-    v.db.run(`vacuum into '${file.replaceAll("'", "''")}'`)
-  }
-  const kept = [...new Bun.Glob("vault-*.db").scanSync(folder)].toSorted().toReversed()
-  for (const old of kept.slice(14)) {
-    rmSync(path.join(folder, old), { force: true })
-  }
-  return file
 }

@@ -10,7 +10,7 @@ import { Models, serveStdio } from "spur-kit"
 
 import { announce, secretsApp } from "./app.ts"
 import { approveCode, serial, touched } from "./ops.ts"
-import { backup, devices, dir, openDb, openVault, seedGrants, spurs } from "./store.ts"
+import { devices, dir, openDb, openVault, seedGrants, spurs } from "./store.ts"
 import type { Vault } from "./store.ts"
 
 /** Devices and spurs without their keys. */
@@ -81,15 +81,6 @@ const approvals = (v: Vault) =>
 const background = Layer.effectDiscard(
   Effect.gen(function* starting() {
     yield* Effect.forkScoped(announce)
-    // A copy of the sealed vault a day, kept for two weeks.
-    yield* Effect.forkScoped(
-      Effect.forever(
-        Effect.andThen(
-          Effect.sync(() => backup(vault)),
-          Effect.sleep("6 hours"),
-        ),
-      ).pipe(Effect.ignore),
-    )
     yield* Effect.forkScoped(
       Effect.forever(Effect.andThen(approvals(vault), Effect.sleep("1 second"))).pipe(
         Effect.ignore,
