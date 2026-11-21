@@ -117,8 +117,6 @@ export const Shell = ({ status }: { status: Status }) => {
     lock: () => {
       lock.mutate()
     },
-    // The panel answers this itself.
-    panel: () => null,
   }
 
   const run = (c: Command) => {

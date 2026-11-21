@@ -41,8 +41,6 @@ const MENU: ApplicationMenuItemConfig[] = [
     label: "File",
     submenu: [
       item("New Item", { kind: "new" }, "CommandOrControl+N"),
-      // ⇧⌘Space, from anywhere: the helper holds it, so the menu names no key.
-      item("Quick Search", { kind: "panel" }),
       divider,
       page("Import", "import"),
       page("Export", "export"),

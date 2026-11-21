@@ -155,11 +155,6 @@ export const mainOf = (item: ShownItem) => {
   )
 }
 
-export const totpOf = (item: ShownItem) => item.fields.find((f) => f.type === "totp" && f.set)
-
-export const usernameField = (item: ShownItem) =>
-  item.fields.find((f) => (f.id === "username" || f.type === "email") && f.set)
-
 /** A filter's name as the list's heading shows it. */
 export const filterName = (filter: Filter) => {
   if (filter === "all") {

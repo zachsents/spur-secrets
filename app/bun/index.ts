@@ -1,4 +1,4 @@
-// The Secrets app: one window over the vault, and a quick search panel over whatever's in front.
+// The Secrets app: one window over the vault.
 // This process is the vault's device: it holds the keys and opens items, the views ask it.
 import { existsSync } from "node:fs"
 import path from "node:path"
@@ -9,14 +9,11 @@ import { generate } from "../../src/values.ts"
 import { Command } from "../shared/rpc.ts"
 import type { AppRPC } from "../shared/rpc.ts"
 import { CORE, watchChanges } from "./core.ts"
-import { activate, onHelper } from "./helper.ts"
+import { onHelper } from "./helper.ts"
 import { menuBar } from "./menu.ts"
 import { dialCore, saw } from "./spur.ts"
 import { confirmImport, exportTo, pickImport, previewImport } from "./transfer.ts"
 import * as vault from "./vault.ts"
-
-/** A failure nothing more can be done about (the audit's note, the clipboard's clearing). */
-const ignored = () => null
 
 const dev = (await Updater.localInfo.channel()) === "dev"
 // Testing on a Mac where nobody can pass Touch ID or its password: a dev build only.
@@ -73,43 +70,6 @@ const views = new Set<Rpc>()
 const changed = () => {
   for (const v of views) {
     v.send.changed({})
-  }
-}
-
-let panelWin: BrowserWindow | null = null
-/** The app that was in front when the panel opened, to go back to. */
-let before = 0
-let mainWasShown = false
-
-const closePanel = async () => {
-  if (panelWin?.isVisible() !== true) {
-    return
-  }
-  panelWin.hide()
-  if (mainWasShown) {
-    mainWin.showInactive()
-  }
-  if (before > 0) {
-    await activate(before).catch(ignored)
-  }
-}
-
-const openPanel = (front: number) => {
-  if (!panelWin) {
-    return
-  }
-  before = front
-  mainWasShown = mainOpen && mainWin.isVisible() && !mainWin.isMinimized()
-  // Only the panel comes forward, not the window behind it.
-  if (mainWasShown) {
-    mainWin.hide()
-  }
-  panelWin.center()
-  panelWin.show()
-  panelWin.activate()
-  panelRpc.send.command({ kind: "panel" })
-  if (!vault.isOpen()) {
-    void vault.unlock().catch(ignored)
   }
 }
 
@@ -196,10 +156,6 @@ const requests: Answers = {
     }
     return null
   },
-  panelClose: async () => {
-    await closePanel()
-    return null
-  },
 }
 
 const makeRpc = () =>
@@ -209,10 +165,8 @@ const makeRpc = () =>
   })
 
 let mainRpc: Rpc
-const panelRpc = makeRpc()
-views.add(panelRpc)
 
-/** The window; closing it leaves the app running for the panel, and the Dock brings it back. */
+/** The window; closing it leaves the app running, and the Dock brings it back. */
 const makeMain = () => {
   const rpc = makeRpc()
   const win = new BrowserWindow({
@@ -236,20 +190,6 @@ const makeMain = () => {
 let mainOpen = false
 let mainWin = makeMain()
 
-panelWin = new BrowserWindow({
-  title: "Quick Search",
-  url: `${BASE}?panel`,
-  frame: { width: 620, height: 380 },
-  titleBarStyle: "hidden",
-  hidden: true,
-  rpc: panelRpc,
-})
-panelWin.setAlwaysOnTop(true)
-panelWin.setVisibleOnAllWorkspaces(true)
-panelWin.on("blur", () => {
-  panelWin?.hide()
-})
-
 const send = (c: Command) => {
   if (!mainOpen) {
     mainWin = makeMain()
@@ -265,14 +205,7 @@ Electrobun.events.on("reopen", () => {
   }
 })
 
-const menuRun = (c: Command) => {
-  if (c.kind === "panel") {
-    openPanel(0)
-  } else {
-    send(c)
-  }
-}
-menuBar(menuRun)
+menuBar(send)
 
 vault.onChange(changed)
 
@@ -287,7 +220,7 @@ if (dev && devPort !== undefined && devPort !== "") {
       const name = new URL(request.url).pathname.slice(1)
       const body: unknown = await request.json().catch(() => ({}))
       if (name === "command") {
-        menuRun(Schema.decodeUnknownSync(Command)(body))
+        send(Schema.decodeUnknownSync(Command)(body))
         return Response.json(null)
       }
       const handler = Object.entries(requests).find(([key]) => key === name)?.[1]
@@ -301,13 +234,7 @@ if (dev && devPort !== undefined && devPort !== "") {
   })
 }
 onHelper((e) => {
-  if (e.event === "hotkey") {
-    if (panelWin?.isVisible()) {
-      void closePanel()
-    } else {
-      openPanel(e.front ?? 0)
-    }
-  } else if (e.event === "lock" || e.event === "idle") {
+  if (e.event === "lock" || e.event === "idle") {
     vault.lock()
   }
 })

@@ -3,11 +3,9 @@
 //   auth { reason }      the Mac's own check: Touch ID, else its password
 //   copy { text }        onto the clipboard, marked concealed so clipboard managers skip it → { count }
 //   clear { count }      empties the clipboard if it still holds that copy
-//   activate { pid }     brings that app forward again
-// Events: { event: "hotkey", front } (⇧⌘Space, front the app that was in front), { event: "lock" }
-// (sleep, the screen locked, the user switched away), { event: "idle" } (5 min without input).
+// Events: { event: "lock" } (sleep, the screen locked, the user switched away), { event: "idle" }
+// (5 min without input).
 import AppKit
-import Carbon.HIToolbox
 import LocalAuthentication
 
 let output = FileHandle.standardOutput
@@ -47,14 +45,6 @@ func handle(_ request: [String: Any]) {
     let mine = board.changeCount == (request["count"] as? Int ?? -1)
     if mine { board.clearContents() }
     answer(id, true, ["cleared": mine])
-  case "activate":
-    let pid = pid_t(request["pid"] as? Int ?? 0)
-    if let app = NSRunningApplication(processIdentifier: pid), let url = app.bundleURL {
-      let configuration = NSWorkspace.OpenConfiguration()
-      configuration.activates = true
-      NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, _ in }
-    }
-    answer(id, true)
   default:
     answer(id, false, ["error": "Unknown op"])
   }
@@ -71,19 +61,6 @@ Thread.detachNewThread {
   // The bun process is gone: so is this.
   exit(0)
 }
-
-// ⇧⌘Space through Carbon's hot keys, which need no Accessibility permission (an NSEvent monitor does).
-var hotKey: EventHotKeyRef?
-var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-  let front = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
-  emit(["event": "hotkey", "front": Int(front)])
-  return noErr
-}, 1, &spec, nil, nil)
-let registered = RegisterEventHotKey(
-  UInt32(kVK_Space), UInt32(cmdKey | shiftKey), EventHotKeyID(signature: 0x5357_5348, id: 1),
-  GetApplicationEventTarget(), 0, &hotKey)
-if registered != noErr { emit(["event": "hotkey-taken"]) }
 
 let workspace = NSWorkspace.shared.notificationCenter
 for name in [

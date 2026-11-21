@@ -1,6 +1,6 @@
 // The native helper (app/helper/main.swift, built into the bundle by scripts/app.sh): the Mac's own
-// check (Touch ID, else its password), the clipboard marked concealed, the global shortcut, and
-// sleep, screen lock and idle. One process for the app's life, started again if it ever stops.
+// check (Touch ID, else its password), the clipboard marked concealed, and sleep, screen lock
+// and idle. One process for the app's life, started again if it ever stops.
 import { existsSync } from "node:fs"
 import path from "node:path"
 import { Option, Schema } from "effect"
@@ -18,8 +18,7 @@ const Said = Schema.Union([
     count: Schema.optionalKey(Schema.Finite),
   }),
   Schema.Struct({
-    event: Schema.Literals(["ready", "hotkey", "hotkey-taken", "lock", "idle"]),
-    front: Schema.optionalKey(Schema.Finite),
+    event: Schema.Literals(["ready", "lock", "idle"]),
   }),
 ])
 const decode = Schema.decodeUnknownOption(Schema.fromJsonString(Said))
@@ -118,9 +117,4 @@ export const copyConcealed = async (text: string) => {
 /** Empties the clipboard if it still holds the copy made at `count`. */
 export const clearClipboard = async (count: number) => {
   await ask("clear", { count })
-}
-
-/** Brings an app forward again, by process id. */
-export const activate = async (pid: number) => {
-  await ask("activate", { pid })
 }

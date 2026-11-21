@@ -32,7 +32,6 @@ export const Command = Schema.Union([
       "next",
       "previous",
       "lock",
-      "panel",
     ]),
   }),
   Schema.Struct({ kind: Schema.Literal("page"), page: Schema.Literals(PAGES) }),
@@ -231,7 +230,6 @@ export interface AppRPC {
       importConfirm: Req<None, number>
       export: Req<{ format: "csv" | "json" }, string | null>
       openUrl: Req<{ url: string }, null>
-      panelClose: Req<None, null>
     }
     messages: { seen: Seen; left: Seen }
   }>

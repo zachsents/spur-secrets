@@ -86,11 +86,6 @@ export const Key = ({
   </button>
 )
 
-/** A shortcut written as caps. */
-export const Caps = ({ children }: { children: ReactNode }) => (
-  <kbd className="font-sans text-caption font-medium opacity-70">{children}</kbd>
-)
-
 /** A tooltip the moment the pointer is over it, centered under it. */
 export const Tip = ({ label, children }: { label: string; children: ReactElement }) => (
   <Tooltip.Root>
