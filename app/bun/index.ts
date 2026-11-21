@@ -8,10 +8,9 @@ import Electrobun, { BrowserView, BrowserWindow, Updater, Utils } from "electrob
 import { generate } from "../../src/values.ts"
 import { Command } from "../shared/rpc.ts"
 import type { AppRPC } from "../shared/rpc.ts"
-import { CORE, watchChanges } from "./core.ts"
+import { watchChanges } from "./core.ts"
 import { onHelper } from "./helper.ts"
 import { menuBar } from "./menu.ts"
-import { dialCore, saw } from "./spur.ts"
 import { confirmImport, exportTo, pickImport, previewImport } from "./transfer.ts"
 import * as vault from "./vault.ts"
 
@@ -161,7 +160,7 @@ const requests: Answers = {
 const makeRpc = () =>
   BrowserView.defineRPC<AppRPC>({
     maxRequestTime: 120_000,
-    handlers: { requests, messages: { seen: saw, left: saw } },
+    handlers: { requests, messages: {} },
   })
 
 let mainRpc: Rpc
@@ -239,22 +238,6 @@ onHelper((e) => {
   }
 })
 
-dialCore(
-  {
-    front: () => {
-      if (!mainOpen) {
-        mainWin = makeMain()
-      }
-      mainWin.activate()
-    },
-    send,
-    shown: async () =>
-      mainOpen
-        ? await mainRpc.request.shown({})
-        : { page: "closed", item: null, query: "", listed: 0, locked: !vault.isOpen() },
-  },
-  CORE,
-)
 watchChanges(() => {
   void vault.sync()
 })

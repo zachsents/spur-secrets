@@ -1,6 +1,6 @@
 // The vault, open: the band, then the filters, the list with its search and the item beside it, or
 // a page of its own (the generator, devices, grants, audit, import, export). Commands come from
-// the menu bar, the agent and the keys alike.
+// the menu bar and the keys alike.
 import { useForm, useSelector } from "@tanstack/react-form"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { Suspense, useRef } from "react"
@@ -11,17 +11,8 @@ import { useBridge } from "../bridge.ts"
 import { draftOf } from "../drafts.ts"
 import { listed } from "../listing.ts"
 import { lockMutation, saveMutation, trashMutation } from "../mutations.ts"
-import { queryClient } from "../query.ts"
-import { itemQuery, itemsQuery } from "../queries.ts"
-import {
-  currentRoute,
-  editItem,
-  newItem,
-  openFilter,
-  openItem,
-  openPage,
-  useRoute,
-} from "../route.ts"
+import { itemsQuery } from "../queries.ts"
+import { editItem, newItem, openFilter, openItem, openPage, useRoute } from "../route.ts"
 import type { Route } from "../route.ts"
 import { AuditPage } from "./audit-page.tsx"
 import { Band } from "./band.tsx"
@@ -135,18 +126,7 @@ export const Shell = ({ status }: { status: Status }) => {
     }
   }
 
-  useBridge(run, () => {
-    const now = currentRoute()
-    const id = openOf(now, order)
-    const item = id === null ? undefined : queryClient.getQueryData(itemQuery(id).queryKey)
-    return {
-      page: now.page,
-      item: item ? { id: item.id, title: item.title } : null,
-      query: form.state.values.query,
-      listed: order.length,
-      locked: false,
-    }
-  })
+  useBridge(run)
 
   const side = route.page === "items" || route.page === "edit" || route.page === "new"
 

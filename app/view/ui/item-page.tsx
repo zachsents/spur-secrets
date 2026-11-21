@@ -3,7 +3,6 @@
 import { useMutation, useSuspenseQuery } from "@tanstack/react-query"
 
 import { NOTES } from "../../shared/rpc.ts"
-import { useSeen } from "../bridge.ts"
 import { draftOf } from "../drafts.ts"
 import { when } from "../format.ts"
 import { KIND_NAMES } from "../listing.ts"
@@ -26,7 +25,6 @@ export const ItemPage = ({ id }: { id: string }) => {
   const save = useMutation(saveMutation)
   const trash = useMutation(trashMutation)
   const open = useMutation(openUrlMutation)
-  useSeen("secrets/item", id)
   if (!item) {
     return null
   }

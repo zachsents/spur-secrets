@@ -18,7 +18,7 @@ export const PAGES = [
 ] as const
 export type Page = (typeof PAGES)[number]
 
-/** What the window can be told to do, from a shortcut, the menu bar or the agent. */
+/** What the window can be told to do, from a shortcut or the menu bar. */
 export const Command = Schema.Union([
   Schema.Struct({
     kind: Schema.Literals([
@@ -40,24 +40,6 @@ export const Command = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("search"), query: Schema.String }),
 ])
 export type Command = typeof Command.Type
-
-/** What's on screen, for the agent: never a value. */
-export const Shown = Schema.Struct({
-  page: Schema.String,
-  item: Schema.NullOr(Schema.Struct({ id: Schema.String, title: Schema.String })),
-  query: Schema.String,
-  listed: Schema.Finite,
-  locked: Schema.Boolean,
-})
-export type Shown = typeof Shown.Type
-
-/** Seen by the user: a surface ("secrets/item") and what in it; `ms` once they left it. */
-export const Seen = Schema.Struct({
-  surface: Schema.String,
-  item: Schema.optionalKey(Schema.String),
-  ms: Schema.optionalKey(Schema.Finite),
-})
-export type Seen = typeof Seen.Type
 
 /** Where this Mac stands with the vault. */
 export interface Status {
@@ -231,10 +213,10 @@ export interface AppRPC {
       export: Req<{ format: "csv" | "json" }, string | null>
       openUrl: Req<{ url: string }, null>
     }
-    messages: { seen: Seen; left: Seen }
+    messages: None
   }>
   readonly webview: RPCSchema<{
-    requests: { shown: Req<None, Shown> }
+    requests: None
     messages: { command: Command; changed: None }
   }>
 }
