@@ -133,12 +133,12 @@ const requests: Answers = {
     await vault.revokeDevice(id)
     return null
   },
-  approveSpur: async ({ name }) => {
-    await vault.approveSpur(name)
+  approveExtension: async ({ name }) => {
+    await vault.approveExtension(name)
     return null
   },
-  revokeSpur: async ({ name }) => {
-    await vault.revokeSpur(name)
+  revokeExtension: async ({ name }) => {
+    await vault.revokeExtension(name)
     return null
   },
   grant: async ({ op, grant }) => {

@@ -1,9 +1,9 @@
-// The secrets spur: the vault (store.ts) as tools. The agent's tools never return a concealed value;
-// they use one (a command's environment, a file, a request) or ask the user for one. The rest are
-// for the user's devices and other spurs, which only ever get ciphertext: called through the core
-// (`/widgets/secrets/<tool>`), never offered to the agent.
+// The secrets extension: the vault (store.ts) as tools. The agent's tools never return a concealed
+// value; they use one (a command's environment, a file, a request) or ask the user for one. The
+// rest are for the user's devices and other extensions, which only ever get ciphertext: called
+// through the core (`/widgets/secrets/<tool>`), never offered to the agent.
 import { Effect, Queue, Schema } from "effect"
-import { AppEvents, defineApp, defineEvent, tool } from "spur-kit"
+import { AppEvents, defineApp, defineEvent, tool } from "switch-ext-kit"
 
 import { answer, AnswerInput, approval, ask, AskInput } from "./asks.ts"
 import { ALL_SOURCES, preview, taken } from "./legacy.ts"
@@ -139,7 +139,7 @@ export const secretsApp = (v: Vault) => {
   const importTool = tool(
     "import",
     {
-      description: `Takes in another password manager's export or an old store, once: first without confirm it says what it would add (counts and titles, nothing secret), then with confirm (the token it gave) it adds them. source: chrome (Chrome's exported passwords CSV), apple (Passwords' exported CSV), bitwarden (unencrypted JSON), 1password (CSV), csv (any with a header), browser (what spur-browser kept before the vault), switchboard (old Switchboard's macOS appendage). path: the export's path on the vault's Mac; else the newest in ~/Downloads. The export file is left where it was: it holds every password in the clear, so ask the user to delete it.`,
+      description: `Takes in another password manager's export or an old store, once: first without confirm it says what it would add (counts and titles, nothing secret), then with confirm (the token it gave) it adds them. source: chrome (Chrome's exported passwords CSV), apple (Passwords' exported CSV), bitwarden (unencrypted JSON), 1password (CSV), csv (any with a header), browser (what switch-ext-browser kept before the vault), switchboard (old Switchboard's macOS appendage). path: the export's path on the vault's Mac; else the newest in ~/Downloads. The export file is left where it was: it holds every password in the clear, so ask the user to delete it.`,
       input: Schema.Struct({
         source: Schema.Literals(ALL_SOURCES),
         path: optString,
@@ -209,23 +209,23 @@ export const secretsApp = (v: Vault) => {
     "grants",
     {
       description:
-        "What may use which secrets: each grant's subject (agent, space:<id>, spur:<name>), scope (all, item:, tag:, folder:, kind:) and uses (fill, env, file, http); the devices that hold the vault and the spurs allowed to fill. Only the user changes them, in the apps.",
+        "What may use which secrets: each grant's subject (agent, space:<id>, extension:<name>), scope (all, item:, tag:, folder:, kind:) and uses (fill, env, file, http); the devices that hold the vault and the extensions allowed to fill. Only the user changes them, in the apps.",
       readOnly: true,
     },
     () =>
       sync(() => ({
         grants: store.grants(v),
         devices: store.devices(v).map(({ key: _, ...d }) => d),
-        spurs: store.spurs(v).map(({ key: _, ...s }) => s),
+        extensions: store.extensions(v).map(({ key: _, ...s }) => s),
       })),
   )
 
-  // For devices and spurs: through the core's /widgets, never offered to the agent.
+  // For devices and extensions: through the core's /widgets, never offered to the agent.
 
   const info = tool(
     "info",
     {
-      description: "The vault's id, key version, seq and this spur's public key.",
+      description: "The vault's id, key version, seq and this extension's public key.",
       readOnly: true,
       appOnly: true,
     },
@@ -234,7 +234,7 @@ export const secretsApp = (v: Vault) => {
         vault: v.keys.vault,
         keyVersion: v.keys.version,
         seq: store.seqOf(v),
-        spurKey: v.spurKey,
+        extensionKey: v.extensionKey,
         items: [...v.items.values()].filter((i) => i.trashed === 0).length,
         devices: store.devices(v).filter((d) => d.status === "active").length,
       })),
@@ -368,48 +368,50 @@ export const secretsApp = (v: Vault) => {
   )
 
   const registerTool = tool(
-    "spur_register",
+    "extension_register",
     {
       description:
-        "A spur that fills or sends secrets gives its X25519 key; it waits to be allowed. Returns the vault's key for deposits.",
+        "An extension that fills or sends secrets gives its X25519 key; it waits to be allowed. Returns the vault's key for deposits.",
       appOnly: true,
-      input: Schema.Struct({ spur: Schema.String, key: Schema.String }),
+      input: Schema.Struct({ extension: Schema.String, key: Schema.String }),
     },
     (input) =>
       Effect.gen(function* registering() {
-        const made = yield* w(async () => await ops.registerSpur(v, input.spur, input.key))
+        const made = yield* w(
+          async () => await ops.registerExtension(v, input.extension, input.key),
+        )
         if (made.status === "pending") {
-          yield* approval(v, { spur: input.spur }, input.spur, made.code)
+          yield* approval(v, { extension: input.extension }, input.extension, made.code)
         }
         return made
       }),
   )
 
-  const approveSpurTool = tool(
-    "spur_approve",
+  const approveExtensionTool = tool(
+    "extension_approve",
     {
-      description: "Allows a waiting spur, with a proof.",
+      description: "Allows a waiting extension, with a proof.",
       appOnly: true,
-      input: Schema.Struct({ spur: Schema.String, ...proofInput }),
+      input: Schema.Struct({ extension: Schema.String, ...proofInput }),
     },
-    (input) => w(async () => await ops.approveSpur(v, input.spur, input.proof)),
+    (input) => w(async () => await ops.approveExtension(v, input.extension, input.proof)),
   )
 
-  const revokeSpurTool = tool(
-    "spur_revoke",
+  const revokeExtensionTool = tool(
+    "extension_revoke",
     {
-      description: "Stops a spur using the vault, with a proof.",
+      description: "Stops an extension using the vault, with a proof.",
       appOnly: true,
-      input: Schema.Struct({ spur: Schema.String, ...proofInput }),
+      input: Schema.Struct({ extension: Schema.String, ...proofInput }),
     },
-    (input) => w(async () => await ops.revokeSpur(v, input.spur, input.proof)),
+    (input) => w(async () => await ops.revokeExtension(v, input.extension, input.proof)),
   )
 
   const releaseTool = tool(
     "release",
     {
       description:
-        "Fields of an item sealed to an allowed spur, for one use, after the grants and its URLs allow it.",
+        "Fields of an item sealed to an allowed extension, for one use, after the grants and its URLs allow it.",
       appOnly: true,
       input: ops.ReleaseInput,
     },
@@ -419,7 +421,7 @@ export const secretsApp = (v: Vault) => {
   const depositTool = tool(
     "deposit",
     {
-      description: "An allowed spur keeps an item (a Draft) it sealed to the vault's key.",
+      description: "An allowed extension keeps an item (a Draft) it sealed to the vault's key.",
       appOnly: true,
       input: ops.DepositInput,
     },
@@ -429,20 +431,20 @@ export const secretsApp = (v: Vault) => {
   const answerTool = tool(
     "answer",
     {
-      description: "The core hands back an ask this spur raised.",
+      description: "The core hands back an ask this extension raised.",
       appOnly: true,
       input: AnswerInput,
     },
     (input) =>
-      answer(v, input, async (device, spur) => {
+      answer(v, input, async (device, extension) => {
         await ops.serial(async () => {
           const d = device === undefined ? null : store.device(v, device)
           if (d && d.status === "pending") {
             await store.approveDevice(v, d)
           }
-          const s = spur === undefined ? null : store.spur(v, spur)
+          const s = extension === undefined ? null : store.extension(v, extension)
           if (s && s.status === "pending") {
-            store.putSpur(v, { ...s, status: "active", approved: Date.now() })
+            store.putExtension(v, { ...s, status: "active", approved: Date.now() })
           }
           ops.touched(v)
         })
@@ -477,8 +479,8 @@ export const secretsApp = (v: Vault) => {
       usedTool,
       grantTool,
       registerTool,
-      approveSpurTool,
-      revokeSpurTool,
+      approveExtensionTool,
+      revokeExtensionTool,
       releaseTool,
       depositTool,
       answerTool,

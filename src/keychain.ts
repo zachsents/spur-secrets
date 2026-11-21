@@ -1,7 +1,7 @@
 // This Mac's login Keychain through the `security` tool: one generic item per account under a
 // service, each a JSON object. What goes in is piped to `security -i`, so no secret is ever in a
 // command line. With $SWITCH_SECRETS_KEYFILE set (a test vault), a file only its owner reads
-// stands in for it. Ported from spur-browser's vault.ts.
+// stands in for it. Ported from switch-ext-browser's vault.ts.
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import path from "node:path"
 

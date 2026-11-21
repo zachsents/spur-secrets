@@ -1,4 +1,4 @@
-// The core, from the bun process: the secrets spur's tools as a client calls them (a POST to
+// The core, from the bun process: the secrets extension's tools as a client calls them (a POST to
 // /widgets/secrets/<tool>), and the brain's sync socket, watched for `secrets.changed`.
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
@@ -53,7 +53,7 @@ const decodeResult = Schema.decodeUnknownSync(
   }),
 )
 
-/** Calls one of the spur's tools: its answer, decoded by `schema`, or what went wrong, thrown. */
+/** Calls one of the extension's tools: its answer, decoded by `schema`, or what went wrong, thrown. */
 export const call = async <A>(
   tool: string,
   args: Readonly<Record<string, unknown>>,
@@ -74,7 +74,9 @@ export const call = async <A>(
   const [first] = result.content ?? []
   if (result.isError === true) {
     const said = first?.text ?? "Didn't go through"
-    throw new Error(said.startsWith("No app secrets") ? "The secrets spur isn't running" : said)
+    throw new Error(
+      said.startsWith("No app secrets") ? "The secrets extension isn't running" : said,
+    )
   }
   const raw: unknown = result.structuredContent ?? JSON.parse(first?.text ?? "null")
   return Schema.decodeUnknownSync(schema)(raw)

@@ -1,10 +1,10 @@
 import CryptoKit
 import Foundation
 
-/// The vault's cryptography, as the spur's README and src/crypto.ts say it, byte for byte: the
+/// The vault's cryptography, as the extension's README and src/crypto.ts say it, byte for byte: the
 /// vault key's subkeys (HKDF-SHA256, empty salt), items sealed with AES-256-GCM bound to the vault,
-/// the item and the key version, proofs (HMAC-SHA256 under the approval key), and spur-kit's HPKE
-/// for what's sealed to this device's key.
+/// the item and the key version, proofs (HMAC-SHA256 under the approval key), and switch-ext-kit's
+/// HPKE for what's sealed to this device's key.
 nonisolated enum Crypto {
   struct Failure: LocalizedError {
     let message: String
@@ -57,7 +57,7 @@ nonisolated enum Crypto {
     Data(HMAC<SHA256>.authenticationCode(for: Data(words.utf8), using: keys.approve)).base64EncodedString()
   }
 
-  // MARK: Sealing (spur-kit's sealed.ts)
+  // MARK: Sealing (switch-ext-kit's sealed.ts)
 
   static let sealedDomain = "switch-sealed-v1"
   /// DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-256-GCM.
@@ -88,7 +88,7 @@ nonisolated enum Crypto {
     return String(decoding: try recipient.open(ctBytes, authenticating: Data()), as: UTF8.self)
   }
 
-  /// The 6 digits a device or spur shows for its key, to match on the approving screen.
+  /// The 6 digits a device or extension shows for its key, to match on the approving screen.
   static func code(of key: String) -> String {
     let hash = Array(SHA256.hash(data: Data(base64Encoded: key) ?? Data()))
     let n = (Int(hash[0]) * 65_536 + Int(hash[1]) * 256 + Int(hash[2])) % 1_000_000

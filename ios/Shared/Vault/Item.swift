@@ -1,7 +1,7 @@
 import Foundation
 
 // What the vault holds, as src/model.ts says it: items of a kind, each a title, a name the agent
-// refers to it by, and fields. An item is sealed whole (Crypto.swift); its JSON here is the spur's
+// refers to it by, and fields. An item is sealed whole (Crypto.swift); its JSON here is the extension's
 // `Item`, key for key.
 
 nonisolated enum Kind: String, Codable, CaseIterable, Identifiable, Sendable {

@@ -1,17 +1,17 @@
 {
-  "name": "spur-secrets",
+  "name": "switch-ext-secrets",
   "version": "0.1.0",
   "private": true,
-  "description": "The user's passwords, keys, cards and notes in one end-to-end encrypted vault, as a Switch spur: the agent uses them without seeing them.",
+  "description": "The user's passwords, keys, cards and notes in one end-to-end encrypted vault, as a Switch extension: the agent uses them without seeing them.",
   "license": "MIT",
-  "repository": "github:zachsents/spur-secrets",
+  "repository": "github:zachsents/switch-ext-secrets",
   "type": "module",
   "scripts": {
     "start": "bun src/main.ts",
     "app": "electrobun prepare && vite build && swiftc -O -o dist/secrets-helper app/helper/main.swift && electrobun dev",
     "app:view": "vite",
     "app:build": "sh scripts/app.sh",
-    "typecheck": "tsc --noEmit -p tsconfig.spur.json && tsc --noEmit -p tsconfig.view.json && tsc --noEmit -p tsconfig.bun.json",
+    "typecheck": "tsc --noEmit -p tsconfig.extension.json && tsc --noEmit -p tsconfig.view.json && tsc --noEmit -p tsconfig.bun.json",
     "lint": "oxlint --type-aware --type-check --fix --fix-suggestions",
     "format": "oxfmt --write .",
     "fix": "bun run lint && bun run format",
@@ -21,7 +21,7 @@
     "@modelcontextprotocol/client": "^2.4.0",
     "@modelcontextprotocol/server": "^2.4.0",
     "effect": "^4.1.5",
-    "spur-kit": "github:zachsents/spur-kit#b6096f7"
+    "switch-ext-kit": "github:zachsents/switch-ext-kit#8a500e4"
   },
   "devDependencies": {
     "@babel/core": "^8.1.3",
@@ -52,7 +52,7 @@
     "ultracite": "^8.3.1",
     "vite": "^8.3.8"
   },
-  "spur": {
+  "extension": {
     "name": "secrets",
     "main": "src/main.ts",
     "needs": [

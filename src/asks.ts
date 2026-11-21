@@ -1,9 +1,9 @@
-// Asking the user. A sealed ask takes a secret straight from their device into the vault: the spur
-// makes a one-time key, the user's client seals what they type to it, and the core hands the sealed
-// bytes only to `answer` (spur-kit's sealed asks). While no device is enrolled, a new device or spur
-// is approved the same way, by an approval in the queue showing its code.
+// Asking the user. A sealed ask takes a secret straight from their device into the vault: the
+// extension makes a one-time key, the user's client seals what they type to it, and the core hands
+// the sealed bytes only to `answer` (switch-ext-kit's sealed asks). While no device is enrolled, a
+// new device or extension is approved the same way, by an approval in the queue showing its code.
 import { Effect, Schema } from "effect"
-import { Asks } from "spur-kit"
+import { Asks } from "switch-ext-kit"
 
 import { newKeyPair, openFrom } from "./crypto.ts"
 import { ItemId, KINDS, mainField, TEMPLATES } from "./model.ts"
@@ -30,6 +30,8 @@ const Waiting = Schema.Struct({
 const Approval = Schema.Struct({
   kind: Schema.Literal("approval"),
   device: Schema.optionalKey(Schema.String),
+  extension: Schema.optionalKey(Schema.String),
+  /** `extension` before extensions were renamed: read, never written. */
   spur: Schema.optionalKey(Schema.String),
 })
 const decodeWaiting = Schema.decodeUnknownOption(Schema.Union([Waiting, Approval]))
@@ -132,11 +134,11 @@ export const AnswerInput = Schema.Struct({
 
 const approvedOf = Schema.decodeUnknownOption(Schema.Struct({ approved: Schema.Boolean }))
 
-/** What the core hands back for an ask this spur raised: a sealed answer, or an approval's. */
+/** What the core hands back for an ask this extension raised: a sealed answer, or an approval's. */
 export const answer = (
   v: Vault,
   input: typeof AnswerInput.Type,
-  done: (device: string | undefined, spur: string | undefined) => Promise<void>,
+  done: (device: string | undefined, extension: string | undefined) => Promise<void>,
 ) =>
   Effect.gen(function* answering() {
     const raw = yield* Effect.promise(async () => await store.askOf(v, input.item))
@@ -154,7 +156,7 @@ export const answer = (
         store.devices(v).every((d) => d.status !== "active")
       ) {
         yield* Effect.promise(async () => {
-          await done(w.device, w.spur)
+          await done(w.device, w.extension ?? w.spur)
         })
         return { ok: true }
       }
@@ -217,10 +219,10 @@ export const answer = (
     return { ok: true }
   })
 
-/** While no device is enrolled: an approval in the queue for a new device or spur, with its code. */
+/** While no device is enrolled: an approval in the queue for a new device or extension, with its code. */
 export const approval = (
   v: Vault,
-  what: { device?: string; spur?: string },
+  what: { device?: string; extension?: string },
   title: string,
   code: string,
 ) =>

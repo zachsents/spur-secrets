@@ -52,7 +52,7 @@ export const GrantsPage = ({ items }: { items: readonly ShownItem[] }) => {
       form.reset()
     },
   })
-  const subjects = ["agent", ...(data?.spurs ?? []).map((s) => `spur:${s.name}`)]
+  const subjects = ["agent", ...(data?.extensions ?? []).map((s) => `extension:${s.name}`)]
   const scopes = [
     "all",
     ...KINDS.map((k) => `kind:${k}`),

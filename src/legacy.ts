@@ -1,5 +1,5 @@
 // Imports, run once with a look first: an export file another password manager made (imports.ts
-// reads it), or what lived in this Mac's Keychain before the vault: spur-browser's stored accounts
+// reads it), or what lived in this Mac's Keychain before the vault: switch-ext-browser's stored accounts
 // and kept secrets, and old Switchboard's macOS appendage's. `preview` says what it would add,
 // nothing secret; `apply` with its token adds it.
 import { createHash } from "node:crypto"

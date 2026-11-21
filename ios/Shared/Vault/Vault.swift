@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// A device or spur of the vault, as sync lists them.
+/// A device or extension of the vault, as sync lists them.
 nonisolated struct Member: Identifiable, Hashable, Sendable {
   let id: String
   let name: String
@@ -18,10 +18,10 @@ nonisolated struct Member: Identifiable, Hashable, Sendable {
     status = j["status"].str
   }
 
-  init(spur j: JSON) {
+  init(extension j: JSON) {
     id = j["name"].str
     name = id
-    kind = "spur"
+    kind = "extension"
     key = j["key"].str
     status = j["status"].str
   }
@@ -70,7 +70,7 @@ final class Vault {
   }
 
   var devices: [Member] { cache.devices.array.map(Member.init(device:)) }
-  var spurs: [Member] { cache.spurs.array.map(Member.init(spur:)) }
+  var extensions: [Member] { (cache.extensions ?? .array([])).array.map(Member.init(extension:)) }
 
   // MARK: Enrolling
 
@@ -162,10 +162,10 @@ final class Vault {
         next.items[id] = Cache.Entry(seq: Int(e["seq"].number ?? 0), blob: e["blob"].str)
       }
     }
-    for key in ["devices", "spurs", "grants"] where !r[key].isNull {
+    for key in ["devices", "extensions", "grants"] where !r[key].isNull {
       switch key {
       case "devices": next.devices = r[key]
-      case "spurs": next.spurs = r[key]
+      case "extensions": next.extensions = r[key]
       default: next.grants = r[key]
       }
     }
@@ -256,14 +256,14 @@ final class Vault {
     await sync()
   }
 
-  // MARK: Devices and spurs
+  // MARK: Devices and extensions
 
   func approve(_ member: Member) async throws {
     guard let keys else { throw Failure(message: "Locked") }
     guard !member.key.isEmpty else { throw Failure(message: "The vault sent no key for \(member.name)") }
-    if member.kind == "spur" {
-      let proof = Crypto.prove(keys, Crypto.statement("approve-spur", member.id, member.key))
-      _ = try await core.call("spur_approve", ["spur": .string(member.id), "proof": .string(proof)])
+    if member.kind == "extension" {
+      let proof = Crypto.prove(keys, Crypto.statement("approve-extension", member.id, member.key))
+      _ = try await core.call("extension_approve", ["extension": .string(member.id), "proof": .string(proof)])
     } else {
       let proof = Crypto.prove(keys, Crypto.statement("approve-device", member.id, member.key))
       _ = try await core.call("device_approve", ["device": .string(member.id), "proof": .string(proof)])
@@ -273,9 +273,9 @@ final class Vault {
 
   func revoke(_ member: Member) async throws {
     guard let keys else { throw Failure(message: "Locked") }
-    if member.kind == "spur" {
-      let proof = Crypto.prove(keys, Crypto.statement("revoke-spur", member.id))
-      _ = try await core.call("spur_revoke", ["spur": .string(member.id), "proof": .string(proof)])
+    if member.kind == "extension" {
+      let proof = Crypto.prove(keys, Crypto.statement("revoke-extension", member.id))
+      _ = try await core.call("extension_revoke", ["extension": .string(member.id), "proof": .string(proof)])
     } else {
       let proof = Crypto.prove(keys, Crypto.statement("revoke-device", member.id))
       _ = try await core.call("device_revoke", ["device": .string(member.id), "proof": .string(proof)])

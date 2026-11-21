@@ -1,6 +1,6 @@
 // A field's value as it's kept: checked and normalized by its type (a card number's digits, an
 // expiry as MM/YY, an authenticator key as its otpauth link), and new passwords made. Neither the
-// value nor any part of it is ever in an error. Ported from spur-browser's secrets.ts.
+// value nor any part of it is ever in an error. Ported from switch-ext-browser's secrets.ts.
 import { randomInt } from "node:crypto"
 
 import type { FieldType } from "./model.ts"

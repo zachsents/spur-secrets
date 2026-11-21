@@ -1,6 +1,6 @@
-// Import and export, both on this Mac. An import reads another manager's file here with the spur's
-// own parsers (src/imports.ts), shows what it would add, and on confirm seals each item here. An
-// export opens every item here, after the check, and writes the file the user picks.
+// Import and export, both on this Mac. An import reads another manager's file here with the
+// extension's own parsers (src/imports.ts), shows what it would add, and on confirm seals each item
+// here. An export opens every item here, after the check, and writes the file the user picks.
 import { writeFileSync } from "node:fs"
 import { Utils } from "electrobun/main"
 

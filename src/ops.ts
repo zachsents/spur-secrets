@@ -1,7 +1,7 @@
-// What the spur's tools do with the vault: items made and changed (never a concealed value from the
-// agent), secrets released sealed to a spur or put into a command, a file or a request, deposits
-// from spurs, devices enrolled and synced, sealed asks raised and answered. Every write goes
-// through `serial`, one at a time, and says the vault changed.
+// What the extension's tools do with the vault: items made and changed (never a concealed value
+// from the agent), secrets released sealed to an extension or put into a command, a file or a
+// request, deposits from extensions, devices enrolled and synced, sealed asks raised and answered.
+// Every write goes through `serial`, one at a time, and says the vault changed.
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
@@ -385,10 +385,10 @@ export const trash = async (v: Vault, ref: string, who: string) => {
   return { trashed: item.name }
 }
 
-// Releasing to spurs, and their deposits.
+// Releasing to extensions, and their deposits.
 
 export const ReleaseInput = Schema.Struct({
-  spur: Schema.String,
+  extension: Schema.String,
   /** An item's name or id; or `ref`, a reference (name.field) naming the field too. */
   item: Schema.optionalKey(Schema.String),
   ref: Schema.optionalKey(Schema.String),
@@ -399,8 +399,8 @@ export const ReleaseInput = Schema.Struct({
   space: Schema.optionalKey(Schema.String),
 })
 
-const activeSpur = (v: Vault, name: string) => {
-  const s = store.spur(v, name)
+const activeExtension = (v: Vault, name: string) => {
+  const s = store.extension(v, name)
   if (!s || s.status !== "active") {
     throw new Error(`The vault hasn't allowed ${name} yet`)
   }
@@ -408,11 +408,11 @@ const activeSpur = (v: Vault, name: string) => {
 }
 
 export const release = async (v: Vault, input: typeof ReleaseInput.Type) => {
-  const s = activeSpur(v, input.spur)
+  const s = activeExtension(v, input.extension)
   const named = input.ref === undefined ? null : resolve(v, input.ref)
   const item = named?.item ?? find(v, input.item ?? "")
   const use: UseKind = input.use ?? "fill"
-  const who = `spur:${s.name}`
+  const who = `extension:${s.name}`
   const target = input.url === undefined ? "" : hostOf(input.url)
   const base = { item: item.id, use, who, space: input.space ?? "", why: input.why ?? "", target }
   const refuse = (reason: string): never => {
@@ -465,7 +465,7 @@ export const release = async (v: Vault, input: typeof ReleaseInput.Type) => {
 }
 
 export const DepositInput = Schema.Struct({
-  spur: Schema.String,
+  extension: Schema.String,
   id: Schema.String,
   enc: Schema.String,
   ct: Schema.String,
@@ -474,8 +474,8 @@ export const DepositInput = Schema.Struct({
 const decodeDraft = Schema.decodeUnknownSync(Schema.fromJsonString(Draft))
 
 export const deposit = async (v: Vault, input: typeof DepositInput.Type) => {
-  const s = activeSpur(v, input.spur)
-  const json = await openFrom(v.spurSecret, `deposit:${input.id}`, s.name, {
+  const s = activeExtension(v, input.extension)
+  const json = await openFrom(v.extensionSecret, `deposit:${input.id}`, s.name, {
     enc: input.enc,
     ct: input.ct,
   })
@@ -484,24 +484,29 @@ export const deposit = async (v: Vault, input: typeof DepositInput.Type) => {
     draft.into === undefined && draft.name !== undefined
       ? [...v.items.values()].find((i) => i.name === draft.name && i.trashed === 0)
       : undefined
-  const item = fromDraft(v, named ? { ...draft, into: named.id } : draft, `spur:${s.name}`, true)
+  const item = fromDraft(
+    v,
+    named ? { ...draft, into: named.id } : draft,
+    `extension:${s.name}`,
+    true,
+  )
   await write(v, item)
   note(v, {
     item: item.id,
     use: "save",
-    who: `spur:${s.name}`,
+    who: `extension:${s.name}`,
     field: draft.fields.map((f) => f.id).join(","),
   })
   return { saved: outline(item) }
 }
 
-export const registerSpur = async (v: Vault, name: string, key: string) => {
-  const had = store.spur(v, name)
+export const registerExtension = async (v: Vault, name: string, key: string) => {
+  const had = store.extension(v, name)
   if (had && had.key === key && had.status === "active") {
-    return { spur: name, status: "active" as const, key: v.spurKey }
+    return { extension: name, status: "active" as const, key: v.extensionKey }
   }
   const code = await codeOf(key)
-  store.putSpur(v, {
+  store.putExtension(v, {
     name,
     key,
     code,
@@ -510,7 +515,7 @@ export const registerSpur = async (v: Vault, name: string, key: string) => {
     approved: 0,
   })
   changed(store.seqOf(v))
-  return { spur: name, status: "pending" as const, code, key: v.spurKey }
+  return { extension: name, status: "pending" as const, code, key: v.extensionKey }
 }
 
 // Using secrets for the agent: a command's environment and files, a request, a file kept.
@@ -751,38 +756,38 @@ export const revokeDevice = async (v: Vault, id: string, proof: string | undefin
   return { device: d.id, status: "revoked", keyVersion: v.keys.version }
 }
 
-export const approveSpur = async (v: Vault, name: string, proof: string | undefined) => {
-  const s = store.spur(v, name)
+export const approveExtension = async (v: Vault, name: string, proof: string | undefined) => {
+  const s = store.extension(v, name)
   if (!s || s.status !== "pending") {
     throw new Error(`${name} isn't waiting to be allowed`)
   }
-  await proven(v, statement("approve-spur", s.name, s.key), proof)
-  store.putSpur(v, { ...s, status: "active", approved: now() })
+  await proven(v, statement("approve-extension", s.name, s.key), proof)
+  store.putExtension(v, { ...s, status: "active", approved: now() })
   changed(store.seqOf(v))
-  return { spur: s.name, status: "active" }
+  return { extension: s.name, status: "active" }
 }
 
-export const revokeSpur = async (v: Vault, name: string, proof: string | undefined) => {
-  const s = store.spur(v, name)
+export const revokeExtension = async (v: Vault, name: string, proof: string | undefined) => {
+  const s = store.extension(v, name)
   if (!s) {
-    throw new Error(`No spur ${name}`)
+    throw new Error(`No extension ${name}`)
   }
-  await proven(v, statement("revoke-spur", s.name), proof)
-  store.putSpur(v, { ...s, status: "revoked" })
+  await proven(v, statement("revoke-extension", s.name), proof)
+  store.putExtension(v, { ...s, status: "revoked" })
   changed(store.seqOf(v))
-  return { spur: s.name, status: "revoked" }
+  return { extension: s.name, status: "revoked" }
 }
 
-/** Approves the device or spur showing `code`, from the vault Mac's own terminal. */
+/** Approves the device or extension showing `code`, from the vault Mac's own terminal. */
 export const approveCode = async (v: Vault, code: string) => {
   const d = store.devices(v).find((x) => x.status === "pending" && x.code === code)
   if (d) {
     await store.approveDevice(v, d)
     return `Approved ${d.name}`
   }
-  const s = store.spurs(v).find((x) => x.status === "pending" && x.code === code)
+  const s = store.extensions(v).find((x) => x.status === "pending" && x.code === code)
   if (s) {
-    store.putSpur(v, { ...s, status: "active", approved: now() })
+    store.putExtension(v, { ...s, status: "active", approved: now() })
     return `Allowed ${s.name}`
   }
   throw new Error(`Nothing waits with the code ${code}`)
@@ -807,7 +812,7 @@ export const sync = (v: Vault, device: string, since: number, version: number | 
     status: d.status,
     seq: store.seqOf(v),
     devices: store.devices(v),
-    spurs: store.spurs(v),
+    extensions: store.extensions(v),
   }
   if (d.status === "pending") {
     return { ...base, code: d.code, items: [] }

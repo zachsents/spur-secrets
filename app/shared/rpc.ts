@@ -128,7 +128,7 @@ export interface DeviceRow {
   readonly seen: number
 }
 
-export interface SpurRow {
+export interface ExtensionRow {
   readonly name: string
   readonly key: string
   readonly code: string
@@ -145,7 +145,7 @@ export interface GrantRow {
 
 export interface Members {
   readonly devices: readonly DeviceRow[]
-  readonly spurs: readonly SpurRow[]
+  readonly extensions: readonly ExtensionRow[]
   readonly grants: readonly GrantRow[]
 }
 
@@ -204,8 +204,8 @@ export interface AppRPC {
       members: Req<None, Members>
       approveDevice: Req<{ id: string }, null>
       revokeDevice: Req<{ id: string }, null>
-      approveSpur: Req<{ name: string }, null>
-      revokeSpur: Req<{ name: string }, null>
+      approveExtension: Req<{ name: string }, null>
+      revokeExtension: Req<{ name: string }, null>
       grant: Req<{ op: "add" | "remove"; grant: GrantRow }, null>
       importPick: Req<None, string | null>
       importPreview: Req<{ source: Source; file: string }, Preview>

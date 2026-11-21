@@ -1,22 +1,22 @@
-// The secrets spur as a stdio MCP server: `bun src/main.ts`. With a word, a one-off for the vault
-// Mac's owner at its terminal (or over ssh), which needs no Keychain:
-//   approve <code>   approves the device or spur showing that code (the running spur does it)
-//   status           the vault's devices and spurs, and how many items it holds (nothing secret)
+// The secrets extension as a stdio MCP server: `bun src/main.ts`. With a word, a one-off for the
+// vault Mac's owner at its terminal (or over ssh), which needs no Keychain:
+//   approve <code>   approves the device or extension showing that code (the running extension does it)
+//   status           the vault's devices and extensions, and how many items it holds (nothing secret)
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 
 import { Effect, Layer } from "effect"
-import { Models, serveStdio } from "spur-kit"
+import { Models, serveStdio } from "switch-ext-kit"
 
 import { announce, secretsApp } from "./app.ts"
 import { approveCode, serial, touched } from "./ops.ts"
-import { devices, dir, openDb, openVault, seedGrants, spurs } from "./store.ts"
+import { devices, dir, openDb, openVault, seedGrants, extensions } from "./store.ts"
 import type { Vault } from "./store.ts"
 
-/** Devices and spurs without their keys. */
+/** Devices and extensions without their keys. */
 const show = <A extends { key: string }>(xs: readonly A[]) => xs.map(({ key: _, ...rest }) => rest)
 
-/** Where `approve` leaves a code for the running spur, and finds what it made of it. */
+/** Where `approve` leaves a code for the running extension, and finds what it made of it. */
 const ASKED = path.join(dir(), "approve")
 
 const word = process.argv.at(2)
@@ -29,7 +29,9 @@ if (word === "approve") {
     await Bun.sleep(250)
   }
   const said = `${asked}.done`
-  console.log(existsSync(said) ? readFileSync(said, "utf-8") : "The secrets spur isn't running")
+  console.log(
+    existsSync(said) ? readFileSync(said, "utf-8") : "The secrets extension isn't running",
+  )
   rmSync(asked, { force: true })
   rmSync(said, { force: true })
   process.exit(0)
@@ -41,7 +43,7 @@ if (word === "status") {
     .get()
   console.log(
     JSON.stringify(
-      { items: count?.n ?? 0, devices: show(devices(db)), spurs: show(spurs(db)) },
+      { items: count?.n ?? 0, devices: show(devices(db)), extensions: show(extensions(db)) },
       null,
       1,
     ),

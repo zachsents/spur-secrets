@@ -75,7 +75,7 @@ const DeviceRow = Schema.Struct({
   created: Schema.Finite,
   seen: Schema.Finite,
 })
-const SpurRow = Schema.Struct({
+const ExtensionRow = Schema.Struct({
   name: Schema.String,
   key: Schema.String,
   code: Schema.String,
@@ -97,7 +97,7 @@ const Synced = Schema.Struct({
   key: Schema.optionalKey(Sealed),
   items: Schema.Array(Blob),
   devices: Schema.Array(DeviceRow),
-  spurs: Schema.Array(SpurRow),
+  extensions: Schema.Array(ExtensionRow),
   grants: Schema.optionalKey(Schema.Array(GrantRow)),
 })
 /** What's cached on disk: nothing but blobs and who's in the vault. */
@@ -108,7 +108,7 @@ const Cache = Schema.Struct({
   key: Schema.NullOr(Sealed),
   items: Schema.Array(Blob),
   devices: Schema.Array(DeviceRow),
-  spurs: Schema.Array(SpurRow),
+  extensions: Schema.Array(ExtensionRow),
   grants: Schema.Array(GrantRow),
 })
 type Cache = typeof Cache.Type
@@ -320,7 +320,7 @@ const syncOnce = async () => {
     key: synced.key ?? was?.key ?? null,
     items: [...byId.values()],
     devices: synced.devices,
-    spurs: synced.spurs,
+    extensions: synced.extensions,
     grants: synced.grants ?? [],
   }
   cache = next
@@ -669,7 +669,7 @@ export const purge = async (id: string) => {
 
 export const members = (): Members => ({
   devices: cache?.devices ?? [],
-  spurs: cache?.spurs ?? [],
+  extensions: cache?.extensions ?? [],
   grants: cache?.grants ?? [],
 })
 
@@ -694,19 +694,19 @@ export const revokeDevice = async (id: string) => {
   await sync()
 }
 
-export const approveSpur = async (name: string) => {
-  const s = cache?.spurs.find((x) => x.name === name)
+export const approveExtension = async (name: string) => {
+  const s = cache?.extensions.find((x) => x.name === name)
   if (!s) {
-    throw new Error("No such spur")
+    throw new Error("No such extension")
   }
-  const { proof } = await proven("allow a spur", "approve-spur", s.name, s.key)
-  await call("spur_approve", { spur: s.name, proof }, Any)
+  const { proof } = await proven("allow an extension", "approve-extension", s.name, s.key)
+  await call("extension_approve", { extension: s.name, proof }, Any)
   await sync()
 }
 
-export const revokeSpur = async (name: string) => {
-  const { proof } = await proven("stop a spur", "revoke-spur", name)
-  await call("spur_revoke", { spur: name, proof }, Any)
+export const revokeExtension = async (name: string) => {
+  const { proof } = await proven("stop an extension", "revoke-extension", name)
+  await call("extension_revoke", { extension: name, proof }, Any)
   await sync()
 }
 

@@ -1,13 +1,13 @@
-// The vault on disk: one SQLite file of sealed items, their history, the devices and spurs that may
-// open them, the grants and the audit; the vault key in this Mac's Keychain. Every item is opened
-// into memory when the spur starts and sealed again on every write. Each write bumps the vault's
-// sequence, which is how devices sync (`since`).
+// The vault on disk: one SQLite file of sealed items, their history, the devices and extensions
+// that may open them, the grants and the audit; the vault key in this Mac's Keychain. Every item is
+// opened into memory when the extension starts and sealed again on every write. Each write bumps
+// the vault's sequence, which is how devices sync (`since`).
 import { Database } from "bun:sqlite"
 import { chmodSync, mkdirSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 
 import {
   b64,
@@ -30,14 +30,25 @@ export const dir = (): string =>
 
 const SERVICE = "Switch secrets"
 
-const Kept = Schema.Struct({
+const keyFields = {
   version: Schema.Finite,
   key: Schema.String,
-  spurKey: Schema.String,
-  spurSecret: Schema.String,
   /** The key before a rotation that may not have finished. */
   previous: Schema.optionalKey(Schema.Struct({ version: Schema.Finite, key: Schema.String })),
+}
+const Kept = Schema.Struct({
+  ...keyFields,
+  extensionKey: Schema.String,
+  extensionSecret: Schema.String,
 })
+/** The key pair's names before extensions were renamed: read, never written. */
+const LegacyKept = Schema.Struct({
+  ...keyFields,
+  spurKey: Schema.String,
+  spurSecret: Schema.String,
+})
+const decodeKept = Schema.decodeUnknownOption(Kept)
+const decodeLegacyKept = Schema.decodeUnknownSync(LegacyKept)
 type Kept = typeof Kept.Type
 
 const decodeItem = Schema.decodeUnknownSync(Schema.fromJsonString(Item))
@@ -54,7 +65,7 @@ export interface Device {
   readonly seen: number
 }
 
-export interface Spur {
+export interface Extension {
   readonly name: string
   readonly key: string
   readonly code: string
@@ -96,7 +107,7 @@ create index if not exists items_seq on items (seq);
 create table if not exists history (id text not null, at integer not null, blob text not null);
 create index if not exists history_id on history (id);
 create table if not exists devices (id text primary key, name text not null, kind text not null, key text not null, code text not null, status text not null, created integer not null, approved integer not null default 0, seen integer not null default 0, sealed text not null default '');
-create table if not exists spurs (name text primary key, key text not null, code text not null, status text not null, created integer not null, approved integer not null default 0);
+create table if not exists extensions (name text primary key, key text not null, code text not null, status text not null, created integer not null, approved integer not null default 0);
 create table if not exists grants (id text primary key, subject text not null, scope text not null, uses text not null, created integer not null);
 create table if not exists audit (id integer primary key autoincrement, at integer not null, item text not null, name text not null, field text not null, use text not null, who text not null, space text not null, why text not null, target text not null, ok integer not null, reason text not null);
 create index if not exists audit_item on audit (item, at);
@@ -107,8 +118,8 @@ create table if not exists asks (id text primary key, blob text not null, create
 export interface Vault {
   readonly db: Database
   keys: Keys
-  readonly spurKey: string
-  readonly spurSecret: string
+  readonly extensionKey: string
+  readonly extensionSecret: string
   readonly items: Map<ItemId, Item>
 }
 
@@ -132,8 +143,17 @@ const bump = (v: Vault) => {
 
 const keptOf = async (vault: string): Promise<Kept | null> => {
   const raw = await keychainRead(SERVICE, `vault:${vault}`)
-  return raw === null ? null : Schema.decodeUnknownSync(Kept)(raw)
+  if (raw === null) {
+    return null
+  }
+  return Option.getOrElse(decodeKept(raw), () => {
+    const { spurKey, spurSecret, ...rest } = decodeLegacyKept(raw)
+    return { ...rest, extensionKey: spurKey, extensionSecret: spurSecret }
+  })
 }
+
+const hasTable = (db: Database, name: string) =>
+  db.query("select 1 from sqlite_master where type = 'table' and name = ?").get(name) !== null
 
 /** The vault's file, without its key: what's in it that isn't sealed. */
 export const openDb = (at = dir()): Database => {
@@ -143,6 +163,10 @@ export const openDb = (at = dir()): Database => {
   chmodSync(file, 0o600)
   db.run("pragma journal_mode = wal")
   db.run("pragma busy_timeout = 5000")
+  // The extensions table was `spurs` before extensions were renamed: renamed in place, once.
+  if (hasTable(db, "spurs") && !hasTable(db, "extensions")) {
+    db.run("alter table spurs rename to extensions")
+  }
   db.run(SCHEMA)
   return db
 }
@@ -159,16 +183,28 @@ export const openVault = async (at = dir()): Promise<Vault> => {
       throw new Error("This Mac's Keychain has no key for the vault here: it can't be opened")
     }
     const pair = await newKeyPair()
-    kept = { version: 1, key: b64(newVaultKey()), spurKey: pair.key, spurSecret: pair.secretKey }
+    kept = {
+      version: 1,
+      key: b64(newVaultKey()),
+      extensionKey: pair.key,
+      extensionSecret: pair.secretKey,
+    }
     await keychainWrite(SERVICE, `vault:${vault}`, kept, true)
   }
   const keys = await keysOf(vault, kept.version, unb64(kept.key))
   const v: Vault = {
     db,
     keys,
-    spurKey: kept.spurKey,
-    spurSecret: kept.spurSecret,
+    extensionKey: kept.extensionKey,
+    extensionSecret: kept.extensionSecret,
     items: new Map(),
+  }
+  // Grants to an extension were `spur:<name>` before extensions were renamed: moved, once.
+  const moved = db.run(
+    "update grants set subject = 'extension:' || substr(subject, 6) where subject like 'spur:%'",
+  )
+  if (moved.changes > 0) {
+    bump(v)
   }
   const previous =
     kept.previous === undefined
@@ -304,7 +340,7 @@ export const changedSince = (v: Vault, since: number) =>
     .all(since)
     .map((r) => ({ id: r.id, seq: r.seq, deleted: r.purged === 1, blob: r.blob }))
 
-// Devices and spurs.
+// Devices and extensions.
 
 export const devices = (v: Pick<Vault, "db">): Device[] =>
   v.db
@@ -397,23 +433,23 @@ export const rotate = async (v: Vault) => {
   await keychainWrite(SERVICE, account, { ...kept, version, key: b64(raw) })
 }
 
-export const spurs = (v: Pick<Vault, "db">): Spur[] =>
+export const extensions = (v: Pick<Vault, "db">): Extension[] =>
   v.db
-    .query<Spur, []>(
-      "select name, key, code, status, created, approved from spurs order by created",
+    .query<Extension, []>(
+      "select name, key, code, status, created, approved from extensions order by created",
     )
     .all()
 
-export const spur = (v: Vault, name: string): Spur | null =>
+export const extension = (v: Vault, name: string): Extension | null =>
   v.db
-    .query<Spur, [string]>(
-      "select name, key, code, status, created, approved from spurs where name = ?",
+    .query<Extension, [string]>(
+      "select name, key, code, status, created, approved from extensions where name = ?",
     )
     .get(name)
 
-export const putSpur = (v: Vault, s: Spur) => {
+export const putExtension = (v: Vault, s: Extension) => {
   v.db.run(
-    "insert into spurs (name, key, code, status, created, approved) values (?, ?, ?, ?, ?, ?) on conflict (name) do update set key = excluded.key, code = excluded.code, status = excluded.status, approved = excluded.approved",
+    "insert into extensions (name, key, code, status, created, approved) values (?, ?, ?, ?, ?, ?) on conflict (name) do update set key = excluded.key, code = excluded.code, status = excluded.status, approved = excluded.approved",
     [s.name, s.key, s.code, s.status, s.created, s.approved],
   )
   bump(v)
@@ -453,7 +489,7 @@ export const seedGrants = (v: Vault) => {
     return
   }
   addGrant(v, { subject: "agent", scope: "all", uses: ["fill", "env", "file", "http"] })
-  addGrant(v, { subject: "spur:browser", scope: "all", uses: ["fill"] })
+  addGrant(v, { subject: "extension:browser", scope: "all", uses: ["fill"] })
   setMeta(v.db, "seeded", "1")
 }
 

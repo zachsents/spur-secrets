@@ -1,5 +1,5 @@
 // Authenticator keys (RFC 6238): read from an otpauth:// link or a key a setup page shows, kept as
-// an otpauth:// link in a totp field, and the code they make now. Ported from spur-browser's
+// an otpauth:// link in a totp field, and the code they make now. Ported from switch-ext-browser's
 // accounts.ts.
 import { createHmac } from "node:crypto"
 

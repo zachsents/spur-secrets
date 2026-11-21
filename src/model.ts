@@ -81,7 +81,7 @@ export const Item = Schema.Struct({
   /** Switch spaces it belongs to; none: every space. */
   spaces: Schema.Array(Schema.String),
   favorite: Schema.Boolean,
-  /** Where it came from: "user", "agent", "ask", "import:chrome", "spur:browser". */
+  /** Where it came from: "user", "agent", "ask", "import:chrome", "extension:browser". */
   source: Schema.String,
   /** ms since 1970. */
   created: Schema.Finite,
@@ -91,7 +91,7 @@ export const Item = Schema.Struct({
 })
 export type Item = typeof Item.Type
 
-/** An item as a spur deposits it or an import reads it: the vault fills in the rest. */
+/** An item as an extension deposits it or an import reads it: the vault fills in the rest. */
 export const Draft = Schema.Struct({
   kind: Schema.Literals(KINDS),
   name: Schema.optionalKey(Schema.String),

@@ -1,4 +1,4 @@
-# spur-secrets
+# switch-ext-secrets
 
 The user's passwords, logins, API keys, cards, notes, authenticator keys and SSH keys in one
 vault, encrypted at rest and end to end to the user's own devices. The agent uses them without
@@ -6,11 +6,11 @@ ever seeing them: a browser field filled, a command's environment, a file, an HT
 is checked against grants and kept in an audit. The user browses, reveals, copies and edits them on
 the Mac and iPhone, and the iPhone fills them in Safari and apps.
 
-A [Switch](https://switch.ax) spur, built on [spur-kit](https://github.com/zachsents/spur-kit).
+A [Switch](https://switch.ax) extension, built on [switch-ext-kit](https://github.com/zachsents/switch-ext-kit).
 
 ## Install
 
-Ask Switch's agent to install `github:zachsents/spur-secrets`, or add it in the desktop's Spurs
+Ask Switch's agent to install `github:zachsents/switch-ext-secrets`, or add it in the desktop's Extensions
 view. It runs on the core's always-on machine (`needs: ["always-on"]`), a Mac: the vault key is in
 that Mac's login Keychain. Its store is `$SWITCH_SECRETS_DIR`, else `$SWITCH_DIR/secrets`, else
 `~/.switch/secrets`.
@@ -46,7 +46,7 @@ An item's **name** is lowercase letters, digits and `. _ / @ -` (`github`, `card
 ## Crypto
 
 - **Vault key** `VK`: 32 random bytes, made once, kept in the vault Mac's login Keychain (service
-  `Switch secrets`, account `vault:<vault id>`, beside this spur's own key pair), piped to
+  `Switch secrets`, account `vault:<vault id>`, beside this extension's own key pair), piped to
   `security -i` so it's never in argv. A Keychain that can't be read is an error, never a new key.
   Rotated (a new key version) whenever a device is revoked; a rotation cut short finishes at the
   next start.
@@ -56,23 +56,23 @@ An item's **name** is lowercase letters, digits and `. _ / @ -` (`github`, `card
   with additional data `switch-secrets-v1\0<vault id>\0<item id>\0<key version>`. The JSON is the
   whole item (`Item` in `src/model.ts`). Its history rows are blobs the same way. The SQLite file
   holds only blobs and what's needed to sync them: no title, URL or username in the clear.
-- **Sealing** is spur-kit's HPKE (RFC 9180 base mode: DHKEM(X25519, HKDF-SHA256), HKDF-SHA256,
+- **Sealing** is switch-ext-kit's HPKE (RFC 9180 base mode: DHKEM(X25519, HKDF-SHA256), HKDF-SHA256,
   AES-256-GCM; CryptoKit's `.Curve25519_SHA256_AES_GCM_256`), its `info` being
   `switch-sealed-v1\0<item>\0<use>`. Every sealing here names its own `item` and `use`:
   - the vault key to a device: item `device:<device id>`, use `vault-key:<vault id>:<key version>`,
     the secret `base64(VK)`;
-  - a release to a spur: item `release:<release id>`, use `<spur>:<item id>`, the secret a JSON
+  - a release to an extension: item `release:<release id>`, use `<extension>:<item id>`, the secret a JSON
     object of field id → value;
-  - a deposit from a spur to this one: item `deposit:<deposit id>`, use `<spur>`, the secret the
+  - a deposit from an extension to this one: item `deposit:<deposit id>`, use `<extension>`, the secret the
     item JSON (`Draft` in `src/model.ts`);
-  - a sealed ask's answer: as spur-kit's sealed asks make it.
-- **This spur's key** (an X25519 pair for deposits) is in the same Keychain item.
-- **Proofs.** What only the user may do (approve a device or a spur, revoke, change grants, purge)
+  - a sealed ask's answer: as switch-ext-kit's sealed asks make it.
+- **This extension's key** (an X25519 pair for deposits) is in the same Keychain item.
+- **Proofs.** What only the user may do (approve a device or an extension, revoke, change grants, purge)
   carries `proof` = `base64(HMAC-SHA256(approval key, statement))`, made on an enrolled device,
   which alone holds `VK`. The statement is the NUL-joined words of the call, listed with each tool
   below. Until a device is enrolled, approvals go through the user's queue (an approval item) or
   the vault Mac's own terminal (`bun src/main.ts approve <code>`, which hands the code to the
-  running spur; `status` lists devices and spurs).
+  running extension; `status` lists devices and extensions).
 
 ## Devices and sync
 
@@ -82,14 +82,14 @@ An item's **name** is lowercase letters, digits and `. _ / @ -` (`github`, `card
    code }`. The code (6 digits, from `SHA-256(key)`) shows on the device.
 2. It's approved: from an enrolled device (`device_approve { device, proof }` over
    `approve-device\0<device>\0<key>`), or, while none is, in the user's queue, where the same code
-   shows. The spur then seals `VK` to the device's key.
+   shows. The extension then seals `VK` to the device's key.
 3. `sync { device, since, version? }` → `{ vault, status, seq, keyVersion, key?, items: [{ id, seq,
-   deleted, blob }], devices, spurs, grants }` (devices and spurs with their public keys): every
+   deleted, blob }], devices, extensions, grants }` (devices and extensions with their public keys): every
    item changed after `since` (all of them from 0, or when `version` isn't the key version now).
    `key` (the sealed `VK`) comes when `since` is 0 or the key version moved. A totp field's value
    is an `otpauth://` link; an item's notes count as concealed. The core relays only ciphertext.
    The event `secrets.changed { seq }` says when to sync again.
-4. A device writes by sealing the item itself: `put { device, id, blob }`. The spur checks it opens
+4. A device writes by sealing the item itself: `put { device, id, blob }`. The extension checks it opens
    under the item key (only a holder of `VK` can make one), keeps what it was in history, and
    bumps `seq`. `history { device, id }` → its old blobs. `remove { device, id, purge?, proof? }`
    trashes, restores (`restore: true`) or, with a proof over `purge\0<id>`, purges.
@@ -119,38 +119,38 @@ copy, autofill, export) so the audit is whole.
 - `write_file { path, content, mode?, why }`: a file kept on the vault Mac from a template.
 - `delete { item }`, `import { source, path?, confirm? }`, `audit { item?, limit? }`, `grants`.
 
-## For other spurs
+## For other extensions
 
-A spur that fills or sends secrets (the browser) registers a key: `spur_register { spur, key }`,
-approved like a device (`spur_approve { spur, proof }` over `approve-spur\0<spur>\0<key>`). Then
-`release { spur, item | ref, fields?, url?, use, why?, space? }` → `{ id, item, name, title, labels,
+An extension that fills or sends secrets (the browser) registers a key: `extension_register { extension, key }`,
+approved like a device (`extension_approve { extension, proof }` over `approve-extension\0<extension>\0<key>`). Then
+`release { extension, item | ref, fields?, url?, use, why?, space? }` → `{ id, item, name, title, labels,
 fields, enc, ct }`, the values sealed to it (a totp field as its code now), after the
-grants allow the spur that use and, for an item with `urls`, the page's `url` matches one. It keeps
-what it learns with `deposit { spur, id, enc, ct }`. These go through the core's
+grants allow the extension that use and, for an item with `urls`, the page's `url` matches one. It keeps
+what it learns with `deposit { extension, id, enc, ct }`. These go through the core's
 `/widgets/secrets/<tool>`, as clients call it.
 
 ## Grants
 
-`{ subject, scope, uses }`: `subject` is `spur:<name>`, `space:<id>` or `agent` (any space);
+`{ subject, scope, uses }`: `subject` is `extension:<name>`, `space:<id>` or `agent` (any space);
 `scope` is `all`, `item:<id>`, `tag:<tag>`, `folder:<folder>` or `kind:<kind>`; `uses` are
 `fill`, `env`, `file`, `http`. An item that belongs to spaces is used by the agent only from them;
-one that belongs to none, from any. The vault starts with `agent` and `spur:browser` granted every
+one that belongs to none, from any. The vault starts with `agent` and `extension:browser` granted every
 use on `all`; the user narrows them in the apps (`grant { device, proof, op, grant }`, its
 statements `grant\0add\0<subject>\0<scope>\0<uses, comma-joined>` and `grant\0remove\0<id>`).
 
 ## Audit
 
 Every use (`fill`, `env`, `file`, `http`, `reveal`, `copy`, `autofill`, `export`, `ask`, `save`,
-`delete`, `import`) and every refusal: when, which item and field, who (`agent`, `spur:<name>`,
+`delete`, `import`) and every refusal: when, which item and field, who (`agent`, `extension:<name>`,
 `device:<id>`), from which space, what for, and where it went (a host, a command's name, a file).
-Kept in the spur's own store, never in the brain.
+Kept in the extension's own store, never in the brain.
 
 ## Imports
 
 Each runs once and shows what it would add before it does (`import { source }` then
 `import { source, confirm }`): `chrome` (Chrome's exported passwords CSV), `apple` (Passwords'
 exported CSV), `bitwarden` (unencrypted JSON), `1password` (CSV), `csv`, `switchboard` (the old
-macOS appendage's secrets and accounts) and `browser` (what spur-browser kept before this).
+macOS appendage's secrets and accounts) and `browser` (what switch-ext-browser kept before this).
 
 ## Develop
 

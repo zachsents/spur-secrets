@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The vault's devices and spurs: those waiting, approved here by matching their code, and those
-/// in, each of which can be revoked.
+/// The vault's devices and extensions: those waiting, approved here by matching their code, and
+/// those in, each of which can be revoked.
 struct DevicesView: View {
   let model: Model
   @State private var problem: String?
@@ -11,10 +11,10 @@ struct DevicesView: View {
   private var vault: Vault { model.vault }
 
   var body: some View {
-    let all = vault.devices + vault.spurs
+    let all = vault.devices + vault.extensions
     let pending = all.filter(\.pending)
     let devices = vault.devices.filter(\.active)
-    let spurs = vault.spurs.filter(\.active)
+    let extensions = vault.extensions.filter(\.active)
     VStack(spacing: 0) {
       Down(core: model.core)
       if let problem { Problem(text: problem) }
@@ -43,10 +43,10 @@ struct DevicesView: View {
               }
             }
           }
-          if !spurs.isEmpty {
-            BoardSection(label: "Spurs", count: spurs.count) {
+          if !extensions.isEmpty {
+            BoardSection(label: "Extensions", count: extensions.count) {
               Rule()
-              ForEach(spurs) { m in
+              ForEach(extensions) { m in
                 RowButton(action: { revoking = m }) {
                   Text(m.name).lineLimit(1)
                   Spacer(minLength: 8)

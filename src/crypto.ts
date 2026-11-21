@@ -1,9 +1,9 @@
 // The vault's cryptography, as README.md says it: the vault key's subkeys (HKDF-SHA256), items
-// sealed with AES-256-GCM, proofs (HMAC-SHA256 under the approval key), and spur-kit's HPKE for
-// everything sealed to a key (a device, a spur, a sealed ask). WebCrypto only, so the Mac app's
-// view and bun process use this file as it is.
-import { openSealed, seal, sealedKey } from "spur-kit"
-import type { SealedAnswer } from "spur-kit"
+// sealed with AES-256-GCM, proofs (HMAC-SHA256 under the approval key), and switch-ext-kit's HPKE
+// for everything sealed to a key (a device, an extension, a sealed ask). WebCrypto only, so the Mac
+// app's view and bun process use this file as it is.
+import { openSealed, seal, sealedKey } from "switch-ext-kit"
+import type { SealedAnswer } from "switch-ext-kit"
 
 const subtle = (): SubtleCrypto => globalThis.crypto.subtle
 const utf8 = new TextEncoder()
@@ -102,7 +102,7 @@ export const prove = async (keys: Keys, words: string): Promise<string> =>
 export const verify = async (keys: Keys, words: string, proof: string): Promise<boolean> =>
   await subtle().verify("HMAC", keys.approve, unb64(proof), utf8.encode(words))
 
-/** A device's or spur's key pair: `key` is public, `secretKey` stays where it was made. */
+/** A device's or extension's key pair: `key` is public, `secretKey` stays where it was made. */
 export const newKeyPair: () => Promise<{ key: string; secretKey: string }> = sealedKey
 
 export const sealTo = async (
@@ -119,7 +119,7 @@ export const openFrom = async (
   sealed: SealedAnswer,
 ): Promise<string> => await openSealed(secretKey, item, use, sealed)
 
-/** The 6 digits a device or spur shows for its key, to match on the approving screen. */
+/** The 6 digits a device or extension shows for its key, to match on the approving screen. */
 export const codeOf = async (key: string): Promise<string> => {
   const hash = new Uint8Array(await subtle().digest("SHA-256", unb64(key)))
   const n = ((hash[0] ?? 0) * 65_536 + (hash[1] ?? 0) * 256 + (hash[2] ?? 0)) % 1_000_000

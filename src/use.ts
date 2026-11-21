@@ -6,7 +6,7 @@ import type { Field, Item, Url } from "./model.ts"
 import { codeNow } from "./otp.ts"
 import type { Grant, Vault } from "./store.ts"
 
-/** Who's using it: the agent (from a space), or a spur. */
+/** Who's using it: the agent (from a space), or an extension. */
 export interface Caller {
   readonly who: string
   readonly space: string
@@ -35,7 +35,7 @@ export const find = (v: Vault, given: string): Item => {
   )
 }
 
-/** What spur-browser called a card's parts before the vault. */
+/** What switch-ext-browser called a card's parts before the vault. */
 const ALIASES: Record<string, string> = { name: "holder", "security-code": "cvc" }
 
 /** What a reference names: `name` (its main secret) or `name.field`, the longest name that fits. */
@@ -171,7 +171,7 @@ export const refsIn = (texts: readonly string[]): string[] => [
 export const fill = (text: string, values: ReadonlyMap<string, string>): string =>
   text.replaceAll(TEMPLATE, (_, ref: string) => values.get(ref) ?? "")
 
-/** Secrets in formats with a recognizable shape, as spur-browser masks them. */
+/** Secrets in formats with a recognizable shape, as switch-ext-browser masks them. */
 const SHAPES = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gu,
   /\bsk-(?:ant-|proj-|live-)?[A-Za-z0-9_-]{20,}/gu,

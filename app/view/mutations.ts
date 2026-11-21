@@ -78,8 +78,8 @@ export const revokeDeviceMutation = mutationOptions({
   onSettled: settle,
 })
 
-export const approveSpurMutation = mutationOptions({
-  mutationFn: async (name: string) => await ask.approveSpur({ name }),
+export const approveExtensionMutation = mutationOptions({
+  mutationFn: async (name: string) => await ask.approveExtension({ name }),
   onSettled: settle,
 })
 
@@ -109,7 +109,7 @@ export const openUrlMutation = mutationOptions({
   mutationFn: async (url: string) => await ask.openUrl({ url }),
 })
 
-export const revokeSpurMutation = mutationOptions({
-  mutationFn: async (name: string) => await ask.revokeSpur({ name }),
+export const revokeExtensionMutation = mutationOptions({
+  mutationFn: async (name: string) => await ask.revokeExtension({ name }),
   onSettled: settle,
 })

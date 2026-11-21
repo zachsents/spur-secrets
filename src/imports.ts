@@ -1,7 +1,8 @@
-// Other password managers' exports, read into drafts: Chrome's and Apple Passwords' CSV, Bitwarden's
-// unencrypted JSON, 1Password's CSV, and any CSV with a header that names its columns. Logins with
-// the same username and password on the same site come together as one, with each URL. Pure, so the
-// Mac app reads a file on its own Mac with these, and the spur one on the vault's.
+// Other password managers' exports, read into drafts: Chrome's and Apple Passwords' CSV,
+// Bitwarden's unencrypted JSON, 1Password's CSV, and any CSV with a header that names its columns.
+// Logins with the same username and password on the same site come together as one, with each URL.
+// Pure, so the Mac app reads a file on its own Mac with these, and the extension one on the
+// vault's.
 import type { Draft, Field, FieldType, Kind } from "./model.ts"
 import { TEMPLATES } from "./model.ts"
 

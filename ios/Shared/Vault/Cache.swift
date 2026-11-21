@@ -24,9 +24,10 @@ nonisolated struct Cache: Codable, Sendable {
   /// The vault key, sealed to this device, for `keyVersion`.
   var sealed: Sealed?
   var items: [String: Entry] = [:]
-  /// The vault's devices, spurs and grants, as sync last said them.
+  /// The vault's devices, extensions and grants, as sync last said them.
   var devices: JSON = .array([])
-  var spurs: JSON = .array([])
+  /// Optional: a cache written before extensions were renamed has none, and must still load.
+  var extensions: JSON?
   var grants: JSON = .array([])
 
   static var file: URL { Config.folder.appending(path: "vault.json") }

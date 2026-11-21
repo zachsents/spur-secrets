@@ -1,5 +1,5 @@
-// Who holds the vault: this Mac, the devices and spurs waiting (each with the code it shows, to
-// match before approving), and those approved, each revocable. Approving and revoking carry a
+// Who holds the vault: this Mac, the devices and extensions waiting (each with the code it shows,
+// to match before approving), and those approved, each revocable. Approving and revoking carry a
 // proof made here, after the Mac's own check.
 import { useMutation, useQuery } from "@tanstack/react-query"
 import type { ReactNode } from "react"
@@ -7,9 +7,9 @@ import type { ReactNode } from "react"
 import type { DeviceRow } from "../../shared/rpc.ts"
 import {
   approveDeviceMutation,
-  approveSpurMutation,
+  approveExtensionMutation,
   revokeDeviceMutation,
-  revokeSpurMutation,
+  revokeExtensionMutation,
 } from "../mutations.ts"
 import { membersQuery } from "../queries.ts"
 import { Cells } from "./cells.tsx"
@@ -34,16 +34,16 @@ export const DevicesPage = ({ device }: { device: string }) => {
   const { data } = useQuery(membersQuery)
   const approve = useMutation(approveDeviceMutation)
   const revoke = useMutation(revokeDeviceMutation)
-  const allow = useMutation(approveSpurMutation)
-  const stop = useMutation(revokeSpurMutation)
+  const allow = useMutation(approveExtensionMutation)
+  const stop = useMutation(revokeExtensionMutation)
   const failed = approve.error ?? revoke.error ?? allow.error ?? stop.error
   const devices = data?.devices ?? []
-  const spurs = data?.spurs ?? []
+  const extensions = data?.extensions ?? []
   const me = devices.find((d) => d.id === device)
   const waiting = devices.filter((d) => d.status === "pending")
   const others = devices.filter((d) => d.status === "active" && d.id !== device)
-  const spursWaiting = spurs.filter((s) => s.status === "pending")
-  const allowed = spurs.filter((s) => s.status === "active")
+  const extensionsWaiting = extensions.filter((s) => s.status === "pending")
+  const allowed = extensions.filter((s) => s.status === "active")
   return (
     <article className="min-h-full bg-paper">
       {failed && (
@@ -52,8 +52,8 @@ export const DevicesPage = ({ device }: { device: string }) => {
           <span className="min-w-0 flex-1 truncate">{failed.message}</span>
         </div>
       )}
-      {(waiting.length > 0 || spursWaiting.length > 0) && (
-        <Section mark={<Hand />} label="Waiting" count={waiting.length + spursWaiting.length}>
+      {(waiting.length > 0 || extensionsWaiting.length > 0) && (
+        <Section mark={<Hand />} label="Waiting" count={waiting.length + extensionsWaiting.length}>
           {waiting.map((d) => (
             <Device
               key={d.id}
@@ -82,10 +82,10 @@ export const DevicesPage = ({ device }: { device: string }) => {
               }
             />
           ))}
-          {spursWaiting.map((s) => (
+          {extensionsWaiting.map((s) => (
             <Cells
               key={s.name}
-              label="Spur"
+              label="Extension"
               end={
                 <>
                   <Code code={s.code} />
@@ -141,11 +141,11 @@ export const DevicesPage = ({ device }: { device: string }) => {
           />
         ))}
       </Section>
-      <Section label="Spurs" count={allowed.length}>
+      <Section label="Extensions" count={allowed.length}>
         {allowed.map((s) => (
           <Cells
             key={s.name}
-            label="Spur"
+            label="Extension"
             end={
               <Key
                 disabled={stop.isPending}

@@ -50,7 +50,7 @@ struct ListView: View {
     }
   }
 
-  private var pending: Int { (vault.devices + vault.spurs).filter(\.pending).count }
+  private var pending: Int { (vault.devices + vault.extensions).filter(\.pending).count }
 
   var body: some View {
     VStack(spacing: 0) {
