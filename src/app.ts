@@ -111,6 +111,7 @@ export const secretsApp = (v: Vault) => {
     {
       description: `Runs a command on the vault's Mac with secrets in it by reference, never seen by you: env {"API_TOKEN": "openai"} (a reference: an item's name for its main secret, or name.field like card/main.number or github.totp for the code now; or a template with {{ref}} in it), files [{name, content}] made for the run in $SECRETS_FILES (0600, removed after), and stdin, both templates. command is a shell line or an argv; never a secret in it. Output comes back with every vault value hidden. why says what it's for (kept in the audit); space is the one you're working in.`,
       input: ops.RunInput,
+      speaks: true,
     },
     (input) => task(async () => await ops.run(v, input)),
   )
@@ -120,6 +121,7 @@ export const secretsApp = (v: Vault) => {
     {
       description: `An HTTPS request with secrets in its headers, query or body as {{ref}} templates ({"Authorization": "Bearer {{openai}}"}), sent only to a host the item lists in its urls. The response comes back with every vault value hidden; redirects aren't followed. why says what it's for.`,
       input: ops.HttpInput,
+      speaks: true,
     },
     (input) => task(async () => await ops.http(v, input)),
   )
