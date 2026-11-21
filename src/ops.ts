@@ -279,7 +279,6 @@ export const SaveInput = Schema.Struct({
     Schema.Struct({
       field: Schema.String,
       path: Schema.String,
-      keep: Schema.optionalKey(Schema.Boolean),
     }),
   ),
   restore: Schema.optionalKey(Schema.Boolean),
@@ -354,10 +353,7 @@ export const save = async (v: Vault, input: SaveInput, who: string) => {
         true,
       ),
     )
-    if (input.from_file.keep !== true) {
-      rmSync(file, { force: true })
-    }
-    made = `${made === "" ? "" : `${made}; `}kept ${id} from ${input.from_file.path}${input.from_file.keep === true ? "" : " (the file is deleted)"}`
+    made = `${made === "" ? "" : `${made}; `}kept ${id} from ${input.from_file.path}`
   }
   const username =
     input.username === undefined

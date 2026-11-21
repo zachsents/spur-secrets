@@ -106,7 +106,7 @@ copy, autofill, export) so the audit is whole.
   concealed values (what they hold, by field label and type).
 - `save { … }`: makes or changes an item's plain parts, a generated password
   (`generate: { field?, length?, style? }`), or a value from a file on the vault Mac
-  (`from_file: { field, path }`, deleted after). The agent never sets a concealed value itself.
+  (`from_file: { field, path }`). The agent never sets a concealed value itself.
 - `ask { title, kind, name?, field?, urls?, username?, why, space }`: a sealed ask for a secret the
   user types; it's kept straight from their device.
 - `run { command, env?, files?, stdin?, cwd?, timeout?, why, space? }`: runs a command on the vault

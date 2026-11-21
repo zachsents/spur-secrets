@@ -80,7 +80,7 @@ export const secretsApp = (v: Vault) => {
   const saveTool = tool(
     "save",
     {
-      description: `Makes an item or changes one (item: its name or id). Plain parts only: title, name (lowercase, how it's referred to), kind (${KINDS.join(", ")}), username, urls (where a login is filled and the only hosts an API key is sent to), tags, folder ("Work/Clients"), spaces (the only spaces it's used from; none: all), favorite, fields [{id, label?, type?, value}] that aren't concealed, restore (out of the trash). A concealed value never comes from you: generate {field?, style?: random | apple | pin, length?, digits?, symbols?} makes one (a new password, kept; the old one stays in its history), from_file {field, path, keep?} reads one from a file on the vault's Mac and deletes the file, and ask asks the user. Returns the item's outline.`,
+      description: `Makes an item or changes one (item: its name or id). Plain parts only: title, name (lowercase, how it's referred to), kind (${KINDS.join(", ")}), username, urls (where a login is filled and the only hosts an API key is sent to), tags, folder ("Work/Clients"), spaces (the only spaces it's used from; none: all), favorite, fields [{id, label?, type?, value}] that aren't concealed, restore (out of the trash). A concealed value never comes from you: generate {field?, style?: random | apple | pin, length?, digits?, symbols?} makes one (a new password, kept; the old one stays in its history), from_file {field, path} reads one from a file on the vault's Mac, and ask asks the user. Returns the item's outline.`,
       input: ops.SaveInput,
     },
     (input) => w(async () => await ops.save(v, input, "agent")),
