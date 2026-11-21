@@ -136,7 +136,7 @@ what it learns with `deposit { spur, id, enc, ct }`. These go through the core's
 `fill`, `env`, `file`, `http`. An item that belongs to spaces is used by the agent only from them;
 one that belongs to none, from any. The vault starts with `agent` and `spur:browser` granted every
 use on `all`; the user narrows them in the apps (`grant { device, proof, op, grant }`, its
-statement `grant\0<op>\0<grant JSON>`).
+statements `grant\0add\0<subject>\0<scope>\0<uses, comma-joined>` and `grant\0remove\0<id>`).
 
 ## Audit
 
