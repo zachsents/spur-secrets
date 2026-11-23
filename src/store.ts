@@ -453,6 +453,20 @@ export const putExtension = (v: Vault, s: Extension) => {
     [s.name, s.key, s.code, s.status, s.created, s.approved],
   )
   bump(v)
+  if (s.status === "active") {
+    allowFill(v, s.name)
+  }
+}
+
+/**
+ * What allowing an extension means ("Let … use your secrets?"): a grant to fill with any of them,
+ * as the browser's from the start. Its grants stay the user's to change.
+ */
+export const allowFill = (v: Vault, name: string) => {
+  const subject = `extension:${name}`
+  if (!grants(v).some((g) => g.subject === subject)) {
+    addGrant(v, { subject, scope: "all", uses: ["fill"] })
+  }
 }
 
 // Grants.
