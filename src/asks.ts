@@ -219,7 +219,10 @@ export const answer = (
     return { ok: true }
   })
 
-/** While no device is enrolled: an approval in the queue for a new device or extension, with its code. */
+/**
+ * While no device is enrolled: an approval in the queue for a new device or extension (`title`
+ * names what's asked), with its code. One asked again revises its open approval instead of adding one.
+ */
 export const approval = (
   v: Vault,
   what: { device?: string; extension?: string },
@@ -230,14 +233,31 @@ export const approval = (
     if (store.devices(v).some((d) => d.status === "active")) {
       return
     }
-    const asks = yield* Asks
-    const opened = yield* asks.open({
-      title,
-      body: code,
-      kind: "approval",
-      answerTo: "answer",
-      notify: true,
+    const waiting = yield* Effect.promise(async () => {
+      let found: string | undefined
+      for (const id of store.askIds(v)) {
+        const kept = await store.askOf(v, id)
+        if (
+          Schema.is(Approval)(kept) &&
+          kept.device === what.device &&
+          kept.extension === what.extension
+        ) {
+          found = id
+        }
+      }
+      return found
     })
+    const asks = yield* Asks
+    const opened = yield* asks.open(
+      {
+        title,
+        body: `Code: ${code}`,
+        kind: "approval",
+        answerTo: "answer",
+        notify: true,
+      },
+      waiting,
+    )
     yield* Effect.promise(async () => {
       await store.keepAsk(v, opened.id, { kind: "approval", ...what })
     })

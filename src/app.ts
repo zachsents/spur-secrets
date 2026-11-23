@@ -250,7 +250,7 @@ export const secretsApp = (v: Vault) => {
     (input) =>
       Effect.gen(function* enrolling() {
         const made = yield* w(async () => await ops.enroll(v, input.name, input.kind, input.key))
-        yield* approval(v, { device: made.device }, input.name, made.code)
+        yield* approval(v, { device: made.device }, `Let ${input.name} hold your vault?`, made.code)
         return made
       }),
   )
@@ -371,9 +371,13 @@ export const secretsApp = (v: Vault) => {
     "extension_register",
     {
       description:
-        "An extension that fills or sends secrets gives its X25519 key; it waits to be allowed. Returns the vault's key for deposits.",
+        'An extension that fills or sends secrets gives its X25519 key, and `label`, what the user knows it as ("the Mac extension on the Mac mini"); it waits to be allowed. Returns the vault\'s key for deposits.',
       appOnly: true,
-      input: Schema.Struct({ extension: Schema.String, key: Schema.String }),
+      input: Schema.Struct({
+        extension: Schema.String,
+        key: Schema.String,
+        label: Schema.optionalKey(Schema.String),
+      }),
     },
     (input) =>
       Effect.gen(function* registering() {
@@ -381,7 +385,13 @@ export const secretsApp = (v: Vault) => {
           async () => await ops.registerExtension(v, input.extension, input.key),
         )
         if (made.status === "pending") {
-          yield* approval(v, { extension: input.extension }, input.extension, made.code)
+          const label = input.label ?? `the ${input.extension} extension`
+          yield* approval(
+            v,
+            { extension: input.extension },
+            `Let ${label} use your secrets?`,
+            made.code,
+          )
         }
         return made
       }),

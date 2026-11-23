@@ -544,6 +544,13 @@ export const keepAsk = async (v: Vault, id: string, what: unknown) => {
   ])
 }
 
+/** The asks waiting for their answer, oldest first. */
+export const askIds = (v: Vault) =>
+  v.db
+    .query<{ id: string }, []>("select id from asks order by created")
+    .all()
+    .map((r) => r.id)
+
 export const askOf = async (v: Vault, id: string): Promise<unknown> => {
   const row = v.db.query<{ blob: string }, [string]>("select blob from asks where id = ?").get(id)
   if (!row) {
