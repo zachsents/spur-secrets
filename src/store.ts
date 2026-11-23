@@ -507,6 +507,17 @@ export const seedGrants = (v: Vault) => {
   setMeta(v.db, "seeded", "1")
 }
 
+/** Once: extensions allowed before allowing one granted it fill get that grant. */
+export const grantAllowed = (v: Vault) => {
+  if (meta(v.db, "allowed-fill") !== undefined) {
+    return
+  }
+  for (const s of extensions(v).filter((x) => x.status === "active")) {
+    allowFill(v, s.name)
+  }
+  setMeta(v.db, "allowed-fill", "1")
+}
+
 // The audit.
 
 export const record = (v: Vault, u: Use) => {

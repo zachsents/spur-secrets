@@ -503,7 +503,6 @@ export const deposit = async (v: Vault, input: typeof DepositInput.Type) => {
 export const registerExtension = async (v: Vault, name: string, key: string) => {
   const had = store.extension(v, name)
   if (had && had.key === key && had.status === "active") {
-    store.allowFill(v, name)
     return { extension: name, status: "active" as const, key: v.extensionKey }
   }
   const code = await codeOf(key)

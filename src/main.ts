@@ -10,7 +10,7 @@ import { Models, serveStdio } from "switch-ext-kit"
 
 import { announce, secretsApp } from "./app.ts"
 import { approveCode, serial, touched } from "./ops.ts"
-import { devices, dir, openDb, openVault, seedGrants, extensions } from "./store.ts"
+import { devices, dir, extensions, grantAllowed, openDb, openVault, seedGrants } from "./store.ts"
 import type { Vault } from "./store.ts"
 
 /** Devices and extensions without their keys. */
@@ -57,6 +57,7 @@ if (word !== undefined) {
 
 const vault = await openVault()
 seedGrants(vault)
+grantAllowed(vault)
 const app = secretsApp(vault)
 
 /** Approves each code left by `approve`, and says how it went beside it. */
