@@ -1,3 +1,5 @@
+**Moved to [zachsents/switch](https://github.com/zachsents/switch/tree/main/extensions/secrets).** This repo is archived.
+
 # switch-ext-secrets
 
 The user's passwords, logins, API keys, cards, notes, authenticator keys and SSH keys in one
