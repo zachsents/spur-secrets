@@ -18,6 +18,50 @@ const APP = "secrets"
 /** The vault changed: its new seq. Devices sync from the one they have. */
 export const Changed = defineEvent("secrets.changed", 1, Schema.Struct({ seq: Schema.Finite }))
 
+/** Every this often, as its manifest's `heartbeat` promises. */
+const BEAT = 5 * 60_000
+
+/** How the vault is, beaten by the extension's background layer, so it stops when that does. */
+export const Heartbeat = defineEvent(
+  "secrets.heartbeat",
+  1,
+  Schema.Struct({
+    entity: Schema.Literal("sense:secrets"),
+    summary: Schema.String,
+    facts: Schema.Struct({
+      failing: Schema.NullOr(Schema.String),
+      items: Schema.Finite,
+      devices: Schema.Finite,
+    }),
+  }),
+)
+
+/** Beats `secrets.heartbeat` every BEAT: its items, its active devices, and a vault it can't read. */
+export const heartbeat = (v: Vault) =>
+  Effect.gen(function* beating() {
+    const events = yield* AppEvents
+    const beat = Effect.gen(function* one() {
+      let failing: string | null = null
+      let active = 0
+      try {
+        active = store.devices(v).filter((d) => d.status === "active").length
+      } catch (error) {
+        failing = `vault unreadable: ${error instanceof Error ? error.message : String(error)}`
+      }
+      yield* events.emit(
+        Heartbeat.make({
+          entity: "sense:secrets",
+          summary: `${v.items.size} items, ${active} devices`,
+          facts: { failing, items: v.items.size, devices: active },
+        }),
+      )
+    })
+    for (;;) {
+      yield* Effect.ignore(beat, { log: "Warn" })
+      yield* Effect.sleep(`${BEAT} millis`)
+    }
+  })
+
 const task = <A>(f: () => Promise<A>) =>
   Effect.tryPromise({ try: f, catch: (e) => (e instanceof Error ? e : new Error(String(e))) })
 
@@ -495,6 +539,6 @@ export const secretsApp = (v: Vault) => {
       depositTool,
       answerTool,
     ],
-    events: [Changed],
+    events: [Changed, Heartbeat],
   })
 }

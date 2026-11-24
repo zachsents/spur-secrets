@@ -55,6 +55,7 @@
   "extension": {
     "name": "secrets",
     "main": "src/main.ts",
+    "heartbeat": 300000,
     "needs": [
       "always-on"
     ]
